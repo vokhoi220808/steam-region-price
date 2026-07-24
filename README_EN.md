@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-*Vietnamese · [English](#english)*
+*Vietnamese(https://github.com/vokhoi220808/steam-region-price) · [English]*
 
 ---
 
