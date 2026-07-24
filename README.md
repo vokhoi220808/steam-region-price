@@ -15,7 +15,7 @@
 
 ---
 
-Công cụ web giúp so sánh giá game Steam trên **27 khu vực** khác nhau, quy đổi về cùng một loại tiền tệ bằng tỷ giá thời gian thực, và theo dõi giá với thông báo mục tiêu. Tất cả dữ liệu người dùng lưu cục bộ trên trình duyệt — không cần đăng ký, không gửi ra ngoài.
+Công cụ web giúp so sánh giá game Steam trên **27 khu vực** khác nhau, quy đổi về cùng một loại tiền tệ bằng tỷ giá thời gian thực, và theo dõi giá với thông báo mục tiêu. Tất cả dữ liệu người dùng lưu cục bộ trên trình duyệt.
 
 [Try it live](https://steam-region-price.onrender.com) · [Report Bug](https://github.com/vokhoi220808/steam-region-price/issues) · [Request Feature](https://github.com/vokhoi220808/steam-region-price/issues)
 
