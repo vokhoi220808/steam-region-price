@@ -263,8 +263,14 @@ Server đóng vai trò **CORS proxy** — tất cả request đến Steam API đ
 - Công cụ chỉ dùng để tham khảo, **không hỗ trợ** đổi vùng tài khoản Steam.
 
 ---
+## License
 
+Licensed under the [MIT License](LICENSE).
+
+This is an unofficial project and is not affiliated with Valve or Steam.
+See [DISCLAIMER.md](DISCLAIMER.md) for additional information.
 <div align="center">
+
 
 Made with ❤️ for the Steam community
 
