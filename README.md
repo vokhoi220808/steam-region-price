@@ -4,7 +4,7 @@
 
 # Steam Region Price Comparator
 
-**Compare Steam game prices across 27 regions worldwide.**
+**So sánh giá game Steam tại 27 khu vực trên toàn thế giới.**
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Express](https://img.shields.io/badge/Express-5.1-000000?logo=express)](https://expressjs.com)
