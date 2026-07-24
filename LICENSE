@@ -1,25 +1,21 @@
-MIT LICENSE
-# Disclaimer
+MIT License
 
-This project is an independent, unofficial tool and is not affiliated with,
-endorsed by, or sponsored by Valve Corporation or Steam.
+Copyright (c) 2026 vokhoi220808
 
-The software and all related information are provided on an "as is" and
-"as available" basis. Prices, exchange rates, sale dates, regional
-availability, and other data may be delayed, incomplete, or inaccurate.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The author and contributors are not responsible for:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-- Any loss, damage, account restriction, financial loss, or other consequence
-  resulting from the use or misuse of this project.
-- Decisions made based on prices, exchange rates, sale information, or other
-  data displayed by the project.
-- Changes, outages, restrictions, or errors in third-party APIs and services.
-- Any violation of Steam's terms, regional pricing rules, or applicable laws
-  by users of this project.
-
-Users are solely responsible for how they use the project and for verifying
-all information before making purchases or taking any action.
-
-This disclaimer does not override rights or liabilities that cannot legally
-be excluded under applicable law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
