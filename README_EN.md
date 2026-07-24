@@ -11,133 +11,138 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-*[Tiếng Việt](README.md) · [English](README_EN.md)*
+*[Vietnamese](README.md) · **English***
 
 ---
 
-Công cụ web giúp so sánh giá game Steam trên **27 khu vực** khác nhau, quy đổi về cùng một loại tiền tệ bằng tỷ giá thời gian thực, và theo dõi giá với thông báo mục tiêu. Tất cả dữ liệu người dùng lưu cục bộ trên trình duyệt — không cần đăng ký, không gửi ra ngoài.
+A web tool for comparing Steam game prices across **27 regions**, converting them into a common currency using real-time exchange rates, and tracking games against target prices. All user data is stored locally in the browser—no account required and nothing is sent to an external server.
 
-[Try it live](https://steam-region-price.onrender.com) · [Report Bug](https://github.com/vokhoi220808/steam-region-price/issues) · [Request Feature](https://github.com/vokhoi220808/steam-region-price/issues)
+[Try it live](https://steam-region-price.onrender.com) · [Report a bug](https://github.com/vokhoi220808/steam-region-price/issues) · [Request a feature](https://github.com/vokhoi220808/steam-region-price/issues)
 
 </div>
 
 ---
 
-## Mục lục
+## Table of Contents
 
-- [Tính năng](#tính-năng)
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
-- [Cài đặt & Chạy](#cài-đặt--chạy)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
-- [API & Caching](#api--caching)
-- [Bảo mật & Lưu trữ](#bảo-mật--lưu-trữ)
-- [Ghi chú](#ghi-chú)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [Installation and Usage](#installation-and-usage)
+- [Project Structure](#project-structure)
+- [API and Caching](#api-and-caching)
+- [Security and Storage](#security-and-storage)
+- [Notes](#notes)
 
 ---
 
-## Tính năng
+## Features
 
-### 🔍 So sánh giá theo khu vực
-- Tìm game bằng **tên, App ID, hoặc Steam URL** (hỗ trợ autocomplete)
-- So sánh giá trên **27 khu vực**: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, AE
-- Quy đổi tự động bằng **tỷ giá thời gian thực** (cache 6 giờ)
-- 3 chế độ hiển thị: **Bảng**, **Thẻ (Grid)**, **Biểu đồ cột**
-- Sắp xếp, lọc region, toggle hiển thị giá chưa bán, filter đang giảm giá
-- **Xuất CSV**, xem lịch sử giá (IsThereAnyDeal API), copy link chia sẻ
+### 🔍 Regional Price Comparison
+
+- Search for games by **name, App ID, or Steam URL**, with autocomplete support
+- Compare prices across **27 regions**: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, and AE
+- Automatically convert prices using **real-time exchange rates**, cached for six hours
+- Three display modes: **Table**, **Grid**, and **Bar Chart**
+- Sort results, filter regions, show or hide unavailable prices, and display discounted games only
+- **Export to CSV**, view price history through the IsThereAnyDeal API, and copy a shareable link
 
 ### 🏷️ Top Deals
-- Game nổi bật từ Steam API (Specials, Deep Discounts, Free Games, Top Sellers, New Releases)
-- Chế độ Grid & List, tìm kiếm, lọc giảm giá, sắp xếp
-- Chuyển trực tiếp sang so sánh giá
 
-### 📊 Theo dõi giá (Price Tracker)
-- Thêm game bằng tên, App ID hoặc URL với wizard 2 bước
-- Đặt **giá mục tiêu** với tiền tệ tùy chọn
-- **Khu vực ưu tiên** và **khu vực so sánh** cho từng game
-- **Tag**, **bộ sưu tập tùy chỉnh**, **ghi chú**, **ghim** lên đầu
-- Trạng thái: Đạt mục tiêu · Gần mục tiêu · Đang theo dõi · Không có mục tiêu · Lỗi
-- Xu hướng giá: Tăng / Giảm / Không đổi
-- **Thanh tỷ lệ giá** trực quan so sánh region
-- **Summary strip** lọc nhanh theo trạng thái
-- **Toolbar** đầy đủ: tìm kiếm, lọc status/region/tag/khoảng giá, 10 chế độ sắp xếp, grid/list, mật độ hiển thị
-- **Drawer chi tiết** với tab: Tổng quan · Giá theo vùng · Lịch sử cục bộ · Thông tin lưu trữ
-- **Cập nhật giá hàng loạt** (3 worker song song)
+- Featured games from Steam APIs, including Specials, Deep Discounts, Free Games, Top Sellers, and New Releases
+- Grid and list views, search, discount filters, and sorting
+- Open any deal directly in the regional price comparison page
 
-### 💾 Quản lý dữ liệu
-- **Nhập/xuất JSON** (merge, cập nhật, hoặc ghi đè)
-- **Xuất CSV** cho danh sách game
-- **Backup & Restore** tự động trước mỗi lần ghi
-- **Schema versioning** với migration (v0 → v1)
-- **Validation**, **salvage/recovery** cho dữ liệu lỗi
-- **Atomic writes** vào localStorage với temp key verification
-- **History tracking** có giới hạn cấu hình (90/180/366 bản ghi)
+### 📊 Price Tracker
 
-### 🎨 Giao diện
-- **Dark/Light theme** với CSS custom properties
-- **Responsive** — hoạt động tốt trên mobile (bottom sheets, hamburger menu)
-- **Accessible** — ARIA roles, focus traps, keyboard navigation, screen reader labels
-- Skeleton loading, progress bar, error/empty states
-- **i18n** — Tiếng Việt / English
+- Add games by name, App ID, or URL through a two-step flow
+- Set a **target price** in a currency of your choice
+- Configure a **preferred region** and multiple **comparison regions** for each game
+- Add **tags**, **custom collections**, **notes**, and pin important games
+- Statuses include: Target Reached, Near Target, Tracking, No Target, and Error
+- Price trends: Increased, Decreased, or Unchanged
+- A visual **price scale** for comparing regional prices
+- A **summary strip** for quickly filtering by status
+- A complete **toolbar** with search, status/region/tag/price filters, ten sorting modes, grid/list switching, and density controls
+- A **detail drawer** with Overview, Regional Prices, Local History, and Storage Information tabs
+- **Bulk price updates** using three parallel workers
+
+### 💾 Data Management
+
+- **Import and export JSON** using merge, update, or replace modes
+- **Export CSV** for the tracked game list
+- Automatic **backup and restore** before every write
+- **Schema versioning** with migration support from v0 to v1
+- **Validation** and **salvage/recovery** for corrupted data
+- **Atomic LocalStorage writes** using a temporary key and verification before committing
+- Configurable history limits of 90, 180, or 366 records
+
+### 🎨 Interface
+
+- **Dark and light themes** powered by CSS custom properties
+- Fully **responsive**, including mobile bottom sheets and a hamburger menu
+- **Accessible**, with ARIA roles, focus traps, keyboard navigation, and screen-reader labels
+- Skeleton loading, progress indicators, and complete error and empty states
+- **Internationalization** for Vietnamese and English
 
 ---
 
-## Công nghệ sử dụng
+## Technology Stack
 
 | Layer | Technology |
 |---|---|
 | **Backend** | Node.js 18+, Express 5.1, ES Modules |
-| **Frontend** | Vanilla JavaScript, Native ES Modules (không framework) |
-| **Styling** | Pure CSS (~4,200 dòng), CSS Custom Properties |
-| **Charts** | Chart.js (CDN) |
-| **Fonts** | Inter (Google Fonts) |
-| **APIs** | Steam Store API, Open Exchange Rates, IsThereAnyDeal |
+| **Frontend** | Vanilla JavaScript and native ES Modules, with no framework |
+| **Styling** | Pure CSS, approximately 4,200 lines, using CSS custom properties |
+| **Charts** | Chart.js through a CDN |
+| **Fonts** | Inter from Google Fonts |
+| **APIs** | Steam Store API, Open Exchange Rates, and IsThereAnyDeal |
 
-**Không có build step** — chạy trực tiếp trên trình duyệt, không cần webpack/vite/rollup.
+There is **no build step**. The application runs directly in the browser without Webpack, Vite, or Rollup.
 
 ---
 
-## Cài đặt & Chạy
+## Installation and Usage
 
-### Yêu cầu
+### Requirements
 
-- **Node.js 18** trở lên
+- **Node.js 18** or later
 
-### Bắt đầu
+### Getting Started
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/vokhoi220808/steam-region-price.git
 cd steam-region-price
 
-# Cài dependencies
+# Install dependencies
 npm install
 
-# Chạy development (auto-reload)
+# Start the development server with automatic reload
 npm run dev
 
-# Hoặc chạy production
+# Or start the production server
 npm start
 ```
 
-Mở trình duyệt tại **http://localhost:3000**.
+Open **http://localhost:3000** in your browser.
 
-### Biến môi trường
+### Environment Variables
 
-Tạo file `.env` trong thư mục gốc (không commit lên git):
+Create a `.env` file in the project root. Do not commit this file to Git.
 
 ```env
 PORT=3000
 ITAD_API_KEY=your_api_key_here
 ```
 
-| Biến | Mặc định | Bắt buộc | Mô tả |
+| Variable | Default | Required | Description |
 |---|---|---|---|
-| `PORT` | `3000` | Không | Port của server |
-| `ITAD_API_KEY` | — | Không | API key từ [IsThereAnyDeal](https://isthereanydeal.com/dev/key/) — cần cho tính năng lịch sử giá |
+| `PORT` | `3000` | No | Server port |
+| `ITAD_API_KEY` | — | No | API key from [IsThereAnyDeal](https://isthereanydeal.com/dev/key/), required for price history |
 
-> **Lưu ý:** Không có `ITAD_API_KEY` thì ứng dụng vẫn chạy bình thường, chỉ mất phần lịch sử giá (tab "Lịch sử" trong drawer chi tiết sẽ hiển thị simulated data thay vì data thật).
+> **Note:** The application still works without `ITAD_API_KEY`. Only the price-history feature is affected; the History tab in the detail drawer will display simulated development data instead of live API data.
 
-### Kiểm thử
+### Testing
 
 ```bash
 npm test
@@ -145,59 +150,59 @@ npm test
 
 ### Scripts
 
-| Script | Mô tả |
+| Script | Description |
 |---|---|
-| `npm start` | Khởi động server production |
-| `npm run dev` | Dev server với file watching (`node --watch`) |
-| `npm test` | Chạy tất cả test (`node --test`) |
+| `npm start` | Start the production server |
+| `npm run dev` | Start the development server with file watching using `node --watch` |
+| `npm test` | Run all tests using Node.js's built-in test runner |
 
 ---
 
-## Cấu trúc dự án
+## Project Structure
 
-```
+```text
 steam-region-price-comparator/
-├── server.js                    # Express server — API proxy & caching
+├── server.js                    # Express server — API proxy and caching
 ├── package.json
 ├── public/
-│   ├── index.html               # Single-page app (657 dòng)
-│   ├── app.js                   # Main controller (2,062 dòng)
-│   ├── style.css                # Theme & layout (1,094 dòng)
-│   ├── tracker.css              # Price tracker styles (3,077 dòng)
+│   ├── index.html               # Single-page application, 657 lines
+│   ├── app.js                   # Main controller, 2,062 lines
+│   ├── style.css                # Theme and layout, 1,094 lines
+│   ├── tracker.css              # Price tracker styles, 3,077 lines
 │   ├── logo.jpg
 │   └── modules/
 │       ├── components/          # UI components
-│       │   ├── game-card.js         # Game card (grid view)
-│       │   ├── game-row.js          # Game row (list view)
+│       │   ├── game-card.js         # Game card for grid view
+│       │   ├── game-row.js          # Game row for list view
 │       │   ├── game-drawer.js       # Detail drawer with tabs
 │       │   ├── game-sheet.js        # Add/edit game sheet
-│       │   ├── price-scale.js       # Visual price scale bar
-│       │   ├── summary-strip.js     # Status summary quick filters
-│       │   ├── tracker-toolbar.js   # Filter/sort toolbar
-│       │   ├── data-manager.js      # Import/export/backup modal
-│       │   ├── confirm-dialog.js    # Accessible confirm dialog
-│       │   └── empty-state.js       # Empty/no-results states
+│       │   ├── price-scale.js       # Visual price scale
+│       │   ├── summary-strip.js     # Status summary and quick filters
+│       │   ├── tracker-toolbar.js   # Filter and sorting toolbar
+│       │   ├── data-manager.js      # Import/export/backup dialog
+│       │   ├── confirm-dialog.js    # Accessible confirmation dialog
+│       │   └── empty-state.js       # Empty and no-results states
 │       ├── services/            # API layer
 │       │   ├── steam-service.js     # Steam API client
 │       │   └── history-simulation.js # Simulated price history
 │       ├── storage/             # LocalStorage persistence
-│       │   ├── storage-schema.js        # Data schema & defaults
-│       │   ├── storage-validation.js    # Validation & sanitization
+│       │   ├── storage-schema.js        # Data schema and defaults
+│       │   ├── storage-validation.js    # Validation and sanitization
 │       │   ├── storage-migrations.js    # Schema migration system
 │       │   ├── storage-repository.js    # Full CRUD repository
-│       │   └── storage-import-export.js # JSON/CSV import/export
+│       │   └── storage-import-export.js # JSON/CSV import and export
 │       ├── tracker/             # Tracker feature logic
-│       │   ├── tracker-store.js     # Reactive pub/sub store
-│       │   ├── tracker-status.js    # Status computation
-│       │   ├── tracker-filters.js   # Filter & sort logic
+│       │   ├── tracker-store.js     # Reactive publish/subscribe store
+│       │   ├── tracker-status.js    # Status calculation
+│       │   ├── tracker-filters.js   # Filtering and sorting logic
 │       │   └── tracker-page.js      # Page orchestrator
 │       └── utils/               # Shared utilities
-│           ├── currency.js     # Currency formatting
-│           ├── dates.js        # Date formatting
-│           ├── debounce.js     # Debounce & throttle
-│           ├── dom.js          # DOM helpers, focus trap, XSS safety
-│           └── ids.js          # UUID generation
-└── test/                        # Tests (Node.js built-in runner)
+│           ├── currency.js      # Currency formatting
+│           ├── dates.js         # Date formatting
+│           ├── debounce.js      # Debounce and throttle helpers
+│           ├── dom.js           # DOM helpers, focus trap, and XSS protection
+│           └── ids.js           # UUID generation
+└── test/                        # Tests using Node.js's built-in runner
     ├── history-simulation.test.js
     ├── price-scale.test.js
     ├── storage-repository.test.js
@@ -205,62 +210,62 @@ steam-region-price-comparator/
     └── tracker-markup.test.js
 ```
 
-**Tổng cộng ~7,800 dòng mã nguồn** (không tính node_modules).
+The project contains approximately **7,800 lines of source code**, excluding `node_modules`.
 
 ---
 
-## API & Caching
+## API and Caching
 
 ### Backend Routes
 
-| Route | Mô tả |
+| Route | Description |
 |---|---|
-| `GET /api/regions` | Danh sách 27 khu vực (code, tên, flag) |
-| `GET /api/search?q=...` | Tìm kiếm game qua Steam Store Search API |
-| `GET /api/compare/:appId?currency=VND&regions=vn,us,...` | Lấy giá theo khu vực, quy đổi, xếp hạng |
-| `GET /api/history/:appId` | Lịch sử giá từ IsThereAnyDeal API |
-| `GET /api/deals?cc=VN` | Game nổi bật từ Steam Featured Categories API |
+| `GET /api/regions` | Return the 27 supported regions, including code, name, and flag |
+| `GET /api/search?q=...` | Search for games through the Steam Store Search API |
+| `GET /api/compare/:appId?currency=VND&regions=vn,us,...` | Fetch regional prices, convert currencies, and rank the results |
+| `GET /api/history/:appId` | Fetch price history from the IsThereAnyDeal API |
+| `GET /api/deals?cc=VN` | Fetch featured games from the Steam Featured Categories API |
 
 ### API Keys
 
-| API | Auth | Ghi chú |
+| API | Authentication | Notes |
 |---|---|---|
-| **Steam Store API** | Không cần key | Miễn phí, có rate limit |
-| **Open Exchange Rates** | Không cần key | Free tier, cache 6 giờ |
-| **IsThereAnyDeal** | Cần API key | Miễn phí, đăng ký tại [isthereanydeal.com/dev/key](https://isthereanydeal.com/dev/key/) |
+| **Steam Store API** | No key required | Free to access, with rate limits |
+| **Open Exchange Rates** | No key required | Free tier, cached for six hours |
+| **IsThereAnyDeal** | API key required | Free registration at [isthereanydeal.com/dev/key](https://isthereanydeal.com/dev/key/) |
 
-> **Tại sao cần CORS proxy?** — Steam API không hỗ trợ CORS, nên tất cả request từ frontend đều đi qua server backend để bypass giới hạn trình duyệt.
+> **Why is a CORS proxy required?** Steam's API does not support browser CORS requests, so all frontend requests are sent through the backend server.
 
 ### Caching Strategy
 
-| Dữ liệu | TTL | Storage |
+| Data | TTL | Storage |
 |---|---|---|
-| Giá game | 20 phút | In-memory Map |
-| Tỷ giá | 6 giờ | In-memory Map |
+| Game prices | 20 minutes | In-memory `Map` |
+| Exchange rates | 6 hours | In-memory `Map` |
 
-Server đóng vai trò **CORS proxy** — tất cả request đến Steam API đều đi qua backend để tránh giới hạn trình duyệt.
-
----
-
-## Bảo mật & Lưu trữ
-
-- **Không có đăng ký** — không thu thập thông tin cá nhân
-- **Dữ liệu lưu cục bộ** trên localStorage — không gửi ra server
-- **Không chạy nền** — tracker chỉ cập nhật khi người dùng chủ động nhấn "Cập nhật giá"
-- **XSS protection** — tất cả dữ liệu đầu vào đều qua `escapeHtml()` trước khi chèn DOM
-- **Atomic writes** — ghi tạm vào temp key, validate, rồi commit để tránh dữ liệu hỏng
-- **Auto backup** — tự động sao lưu trước mỗi lần ghi dữ liệu mới
-- **Schema versioning** — hỗ trợ migration khi schema thay đổi
+The server acts as a **CORS proxy**, routing requests to Steam APIs to avoid browser restrictions.
 
 ---
 
-## Ghi chú
+## Security and Storage
 
-- Steam Storefront API có thể thay đổi hoặc giới hạn truy cập bất cứ lúc nào.
-- Tỷ giá được lấy từ `open.er-api.com` và cache 6 giờ.
-- Giá Steam được cache 20 phút để giảm số request.
-- Lịch sử trong tracker chỉ gồm các lần giá thay đổi đã được lưu trên thiết bị này; đây **không phải lịch sử giá chính thức** của Steam.
-- Công cụ chỉ dùng để tham khảo, **không hỗ trợ** đổi vùng tài khoản Steam.
+- **No registration required** — no personal information is collected
+- **Local-only data** — tracker data is stored in LocalStorage and is not sent to the server
+- **No background processing** — prices are updated only when the user manually selects “Update prices”
+- **XSS protection** — all input data is processed through `escapeHtml()` before being inserted into the DOM
+- **Atomic writes** — data is written to a temporary key, validated, and then committed
+- **Automatic backups** — the previous data state is saved before each write
+- **Schema versioning** — migrations are supported when the data schema changes
+
+---
+
+## Notes
+
+- Steam's Storefront API may change or restrict access at any time.
+- Exchange rates are fetched from `open.er-api.com` and cached for six hours.
+- Steam prices are cached for 20 minutes to reduce the number of requests.
+- Tracker history contains only price changes saved on the current device. It is **not official Steam price history**.
+- This tool is for reference only and **does not support changing the region of a Steam account**.
 
 ---
 
