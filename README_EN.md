@@ -272,5 +272,10 @@ The server acts as a **CORS proxy**, routing requests to Steam APIs to avoid bro
 <div align="center">
 
 Made with ❤️ for the Steam community
+## License
 
+Licensed under the [MIT License](LICENSE).
+
+This is an unofficial project and is not affiliated with Valve or Steam.
+See [DISCLAIMER.md](DISCLAIMER.md) for additional information.
 </div>
