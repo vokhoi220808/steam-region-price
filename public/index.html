@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>So sánh giá game Steam theo từng khu vực</title>
+  <meta name="description" content="Steam Price Compare là công cụ giúp bạn kiểm tra và so sánh giá game Steam tại nhiều quốc gia và khu vực khác nhau." />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="tracker.css?v=24" />
+</head>
+<body>
+  
+  <!-- 4. Header -->
+  <header class="app-header" id="appHeader">
+    <div class="header-container">
+      <div class="header-left">
+        <a href="/" class="brand">
+          <img src="/logo.jpg" alt="Logo" class="brand-logo" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover; margin-right: 12px;" />
+          <div class="brand-text">
+            <h1>Steam Price Compare</h1>
+            <span class="badge">Regional Prices</span>
+          </div>
+        </a>
+      </div>
+      
+      <nav class="header-nav">
+        <a href="#" class="active" id="navCompareBtn" data-i18n="nav_compare">So sánh giá</a>
+        <a href="#" id="navDealsBtn" data-i18n="nav_deals">Top Deals</a>
+        <a href="#" id="navTrackerBtn" data-i18n="nav_track">Theo dõi giá</a>
+      </nav>
+      
+      <div class="header-actions">
+        <select id="globalRegionSelect" class="header-region-select" title="Chọn quốc gia / tiền tệ">
+          <option value="VN">VN (VND)</option>
+          <option value="US">US (USD)</option>
+          <option value="DE">EU (EUR)</option>
+          <option value="CN">CN (CNY)</option>
+          <option value="JP">JP (JPY)</option>
+          <option value="KR">KR (KRW)</option>
+        </select>
+        
+        <button class="icon-btn theme-toggle" title="Đổi giao diện" aria-label="Đổi giao diện">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+        <a href="https://github.com/vokhoi220808/steam-region-price" target="_blank" class="icon-btn" title="GitHub" aria-label="GitHub">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+        </a>
+        <button class="icon-btn" title="Cài đặt" aria-label="Cài đặt">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+        <button class="btn btn-secondary btn-small" id="langToggleBtn" style="margin-left: 12px; font-weight: 600;">EN</button>
+      </div>
+      
+      <button class="icon-btn mobile-menu-btn" aria-label="Menu" id="mobileMenuBtn">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    
+    <!-- 5. Hero & Search -->
+    <section class="hero-section">
+      <div class="hero-inner">
+        <h2 class="hero-title" data-i18n="hero_title">So sánh giá Steam trên toàn thế giới</h2>
+        <p class="hero-desc" data-i18n="hero_desc">Kiểm tra giá game tại nhiều khu vực, quy đổi sang cùng một loại tiền tệ và tìm mức giá tốt nhất chỉ trong vài giây.</p>
+        
+        <div class="search-container">
+          <form id="searchForm" class="search-form">
+            <div class="search-input-group">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="searchInput" class="search-input" data-i18n="search_placeholder" placeholder="Tìm game hoặc dán đường dẫn Steam..." autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="autocompleteList" />
+              
+              <button type="button" class="search-action-btn hidden" id="clearSearchBtn" aria-label="Xóa nội dung">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+              <button type="button" class="search-action-btn" id="pasteBtn" aria-label="Dán từ Clipboard" title="Dán URL">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+              </button>
+              
+              <!-- Autocomplete Dropdown -->
+              <div class="autocomplete-dropdown hidden" id="autocompleteDropdown" role="listbox">
+                <!-- Autocomplete items injected via JS -->
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-large search-submit" id="compareBtn" data-i18n="search_btn">So sánh giá</button>
+          </form>
+          
+          <div class="suggested-games">
+            <button class="chip-btn" data-appid="1245620">ELDEN RING</button>
+            <button class="chip-btn" data-appid="1091500">Cyberpunk 2077</button>
+            <button class="chip-btn" data-appid="271590">GTA V</button>
+            <button class="chip-btn" data-appid="1174180">Red Dead Redemption 2</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Setup Section -->
+    <section class="setup-section container">
+      <div class="card setup-card">
+        <div class="setup-grid">
+          
+          <!-- 7. Region Selection -->
+          <div class="setup-left">
+            <div class="setup-header">
+              <div class="setup-title-group">
+                <h3 data-i18n="region_title">Khu vực cần so sánh</h3>
+                <span class="subtitle" id="regionCountText">Đã chọn 12/18 khu vực</span>
+              </div>
+            </div>
+            
+            <div class="region-controls">
+              <div class="region-search">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="regionSearchInput" data-i18n="search_region" placeholder="Tìm quốc gia hoặc tiền tệ..." />
+              </div>
+              <div class="region-quick-actions">
+                <button class="quick-action-btn" data-action="popular" data-i18n="qa_popular">Phổ biến</button>
+                <button class="quick-action-btn" data-action="asia" data-i18n="qa_asia">Châu Á</button>
+                <button class="quick-action-btn" data-action="sea" data-i18n="qa_sea">Đông Nam Á</button>
+                <button class="quick-action-btn" data-action="all" data-i18n="qa_all">Chọn tất cả</button>
+                <button class="quick-action-btn" data-action="none" data-i18n="qa_none">Bỏ chọn</button>
+              </div>
+            </div>
+            
+            <div class="region-list" id="regionList">
+              <!-- Region cards injected by JS -->
+            </div>
+            
+            <button class="mobile-expand-btn" id="mobileExpandRegions">Xem thêm khu vực</button>
+          </div>
+          
+          <!-- 8. Currency Selection -->
+          <div class="setup-right">
+            <div class="setup-header">
+              <h3 data-i18n="currency_title">Tiền tệ quy đổi</h3>
+            </div>
+            
+            <div class="currency-picker-container">
+              <!-- Custom Combobox -->
+              <div class="combobox-wrapper" id="currencyComboboxWrapper">
+                <label class="combobox-label">Tiền tệ đích</label>
+                <button type="button" class="combobox-trigger" id="currencyComboboxTrigger" aria-haspopup="listbox" aria-expanded="false">
+                  <div class="trigger-content" id="currencyTriggerContent">
+                    <span class="flag">🇻🇳</span> <span class="code">VND</span> <span class="name">Việt Nam Đồng</span>
+                  </div>
+                  <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                
+                <!-- Desktop Popover -->
+                <div class="combobox-popover" id="currencyPopover" role="listbox">
+                  <div class="popover-search">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="currencyPopoverSearch" data-i18n="sheet_search" placeholder="Tìm theo mã hoặc tên tiền tệ..." autocomplete="off">
+                  </div>
+                  <div class="popover-list" id="currencyPopoverList">
+                    <!-- Injected by JS -->
+                  </div>
+                </div>
+              </div>
+              
+              <p class="currency-hint" id="currencyHintText">Tất cả mức giá sẽ được quy đổi sang <strong id="hintCurrencyCode">VND</strong> theo tỷ giá mới nhất.</p>
+              
+              <div class="fx-status">
+                <div class="fx-info">
+                  <span class="status-dot"></span>
+                  <div class="fx-text">
+                    <strong data-i18n="fx_updated">Tỷ giá đã cập nhật</strong>
+                    <span id="fxTime">5 phút trước</span>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-small" id="refreshFxBtn">
+                  <svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  <span data-i18n="refresh_fx">Làm mới tỷ giá</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- 9. Comparison Action summary -->
+            <div class="action-summary">
+              <div class="summary-details">
+                <p id="summaryRegionsText"><strong id="summarySelectedCount">12</strong> khu vực được chọn</p>
+                <p id="summaryConvertedText">Quy đổi sang <strong id="summaryCurrCode">VND</strong></p>
+                <p id="summaryUpdatedText">Tỷ giá cập nhật <span id="summaryFxTime">5 phút trước</span></p>
+              </div>
+              <button class="btn btn-primary btn-block btn-large" id="triggerCompareBtn">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                <span id="compareBtnText">So sánh giá tại <span id="btnRegionCount">12</span> khu vực</span>
+              </button>
+              <div class="reset-wrapper">
+                <button class="text-link" id="resetDefaultsBtn" data-i18n="reset_settings">Khôi phục thiết lập mặc định</button>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Content Area (Status / Data) -->
+    <section class="content-section container">
+      
+      <!-- 17. Empty State -->
+      <div class="state-container" id="emptyState">
+        <div class="state-icon">
+          <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        </div>
+        <h3 class="state-title" data-i18n="empty_title">Tìm một game để bắt đầu so sánh giá</h3>
+        <p class="state-desc" data-i18n="empty_desc">Hãy nhập tên trò chơi hoặc dán Link Steam vào thanh tìm kiếm phía trên.</p>
+      </div>
+
+      <!-- 16. Loading State -->
+      <div class="state-container hidden" id="loadingState">
+        <div class="loading-header">
+          <div class="spinner"></div>
+          <div>
+            <h3 class="state-title" data-i18n="loading_checking">Đang kiểm tra giá tại các khu vực</h3>
+            <p class="state-desc" id="loadingProgressText">0/0 khu vực hoàn tất</p>
+          </div>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="loadingProgressBar" style="width: 0%"></div>
+        </div>
+        
+        <div class="skeleton-layout">
+          <div class="skeleton-game-card">
+            <div class="skeleton-img"></div>
+            <div class="skeleton-details">
+              <div class="skeleton-line" style="width: 60%; height: 24px;"></div>
+              <div class="skeleton-line" style="width: 40%"></div>
+              <div class="skeleton-line" style="width: 30%"></div>
+            </div>
+            <div class="skeleton-summary">
+              <div class="skeleton-line" style="width: 100%; height: 100%;"></div>
+            </div>
+          </div>
+          <div class="skeleton-table">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 18. Error State -->
+      <div class="state-container error-state hidden" id="errorState">
+        <div class="state-icon danger-icon">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        </div>
+        <h3 class="state-title" id="errorTitle" data-i18n="err_title">Không thể lấy giá từ Steam lúc này.</h3>
+        <p class="state-desc" id="errorDesc" data-i18n="err_desc">Đã xảy ra lỗi không mong muốn.</p>
+        <button class="btn btn-secondary mt-16" id="errorRetryBtn" data-i18n="err_retry">Thử lại</button>
+      </div>
+
+      <!-- Results Area -->
+      <div id="resultsArea" class="hidden">
+        
+        <!-- 10. Game Info Card -->
+        <div class="card game-result-card">
+          <div class="game-info-left">
+            <div class="game-cover">
+              <img id="gameCoverImg" src="" alt="Game Cover">
+            </div>
+            <div class="game-details">
+              <h2 id="gameTitleName">Tên Game</h2>
+              <div class="game-meta">
+                <span class="meta-row"><span data-i18n="dev">Nhà phát triển:</span> <strong id="gameDeveloper">...</strong></span>
+                <span class="meta-row"><span data-i18n="release">Phát hành:</span> <strong id="gameRelease">...</strong></span>
+                <span class="meta-row">App ID: <strong id="gameId">...</strong></span>
+              </div>
+              <p id="gameDescription" class="game-desc">Đang tải mô tả...</p>
+              <div class="game-tags" id="gameTags">
+                <span class="tag">Hành động</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="game-info-right">
+            <div class="price-summary-box">
+              <div class="summary-row best-price-row">
+                <div class="label-col">
+                  <span class="label-text" data-i18n="stat_lowest">Giá thấp nhất</span>
+                  <div class="region-val" id="summaryBestRegion">🇨🇳 Trung Quốc</div>
+                </div>
+                <div class="val-col">
+                  <div class="price-val success-text" id="summaryBestPrice">-- VND</div>
+                  <div class="diff-val" id="summaryBestDiff">Rẻ hơn 31% so với khu vực đắt nhất</div>
+                </div>
+              </div>
+              
+              <div class="summary-divider"></div>
+              
+              <div class="summary-row">
+                <div class="label-col">
+                  <span class="label-text" data-i18n="stat_highest">Giá cao nhất</span>
+                </div>
+                <div class="val-col">
+                  <div class="price-val" id="summaryWorstPrice">-- VND</div>
+                </div>
+              </div>
+              
+              <div class="summary-divider"></div>
+              
+              <div class="summary-mini-stats">
+                <div class="mini-stat">
+                  <span data-i18n="stat_regions">Số khu vực bán:</span> <strong id="statAvailCount">0</strong>
+                </div>
+                <div class="mini-stat">
+                  <span data-i18n="stat_sales">Đang giảm giá:</span> <strong id="statDiscountCount">0</strong>
+                </div>
+              </div>
+              
+              <div class="game-actions">
+                <button class="btn btn-primary btn-small icon-only" id="trackGameBtn" title="Đưa vào Radar Theo Dõi Giá">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                </button>
+                <a href="#" id="gameSteamLinkBtn" target="_blank" class="btn btn-secondary btn-small" data-i18n="open_steam">Mở trên Steam</a>
+                <button type="button" class="btn btn-outline btn-small icon-only" id="viewHistoryBtn" title="Xem lịch sử giá" aria-label="Xem lịch sử giá" aria-haspopup="dialog" aria-controls="historyModal">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                </button>
+                <button class="btn btn-secondary btn-small icon-only" id="copyResultLinkBtn" data-i18n="copy_link" title="Sao chép liên kết">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 11. Insight Bar -->
+        <div class="insight-bar" id="insightBar">
+          <!-- Injected via JS -->
+          <span class="icon">💡</span>
+          <span class="text" data-i18n="analyzing">Đang phân tích dữ liệu...</span>
+        </div>
+
+        <!-- 13. Table Toolbar -->
+        <div class="toolbar-section">
+          <div class="toolbar-left">
+            <div class="toolbar-search">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="tableSearchInput" data-i18n="table_search" placeholder="Tìm quốc gia...">
+            </div>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="filterAvailToggle">
+              <span class="checkmark"></span>
+              <span data-i18n="filter_avail">Khu vực có bán</span>
+            </label>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="filterSaleToggle">
+              <span class="checkmark"></span>
+              <span data-i18n="filter_sale">Đang giảm giá</span>
+            </label>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="pinVNToggle">
+              <span class="checkmark"></span>
+              <span data-i18n="filter_pin">Ghim Việt Nam</span>
+            </label>
+          </div>
+          
+          <div class="toolbar-right">
+            <div class="active-currency-display">
+              <span class="text-muted" data-i18n="toolbar_converting">Đang quy đổi sang:</span>
+              <strong id="toolbarCurrDisplay">VND</strong>
+              <button class="text-link small" id="toolbarChangeCurrBtn" data-i18n="toolbar_change">Đổi</button>
+            </div>
+            
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-small" id="exportCsvBtn">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span data-i18n="export_csv">Xuất CSV</span>
+              </button>
+              
+              <div class="view-switcher" id="viewSwitcher">
+                <button class="switch-btn active" data-view="table" title="Bảng">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <button class="switch-btn" data-view="card" title="Card">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                </button>
+                <button class="switch-btn" data-view="chart" title="Biểu đồ">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 12. Data Table View -->
+        <div class="card data-view-container" id="tableView">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="rank"><span data-i18n="t_rank">Hạng</span> <span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort="name"><span data-i18n="t_region">Khu vực</span> <span class="sort-indicator"></span></th>
+                  <th data-i18n="t_steam">Giá Steam</th>
+                  <th class="sortable" data-sort="discount"><span data-i18n="t_discount">Giảm giá</span> <span class="sort-indicator"></span></th>
+                  <th class="sortable text-right th-highlight" data-sort="converted"><span data-i18n="t_converted">Giá quy đổi</span> (<span id="thCurrLabel">VND</span>) <span class="sort-indicator">▼</span></th>
+                  <th class="text-right" data-i18n="t_diff">Chênh lệch</th>
+                  <th data-i18n="t_status">Trạng thái</th>
+                  <th data-i18n="t_action">Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <!-- Data injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 14. Card View (Mobile) -->
+        <div class="data-view-container hidden" id="cardView">
+          <div class="data-grid" id="cardGrid">
+            <!-- Data injected by JS -->
+          </div>
+        </div>
+
+        <!-- 15. Chart View -->
+        <div class="card data-view-container hidden" id="chartView">
+          <div class="chart-header">
+            <h4 id="chartTitleText">Biểu đồ giá quy đổi theo từng khu vực (<span id="chartLabel">VND</span>)</h4>
+          </div>
+          <div class="chart-wrapper" id="barChartWrapper">
+            <!-- Bars injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 9. Warning Area -->
+    <section class="container">
+      <div class="legal-warning">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <p data-i18n="disclaimer">Giá hiển thị chỉ nhằm mục đích tham khảo. Việc thay đổi vùng cửa hàng hoặc sử dụng phương thức che giấu vị trí có thể vi phạm điều khoản sử dụng của Steam.</p>
+      </div>
+    </section>
+    
+    <!-- 10. Deals View -->
+    <section class="container hidden" id="dealsView" style="max-width: var(--max-width); padding-top: 24px; padding-bottom: 60px;">
+      
+      <!-- HERO -->
+      <div class="deals-hero" style="text-align: center; margin-bottom: 32px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Khám phá ưu đãi</div>
+        <h2 style="font-size: 36px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary); letter-spacing: -0.5px;">Top Deals trên Steam</h2>
+        <p style="color: var(--text-secondary); font-size: 16px; max-width: 600px; margin: 0 auto 20px;">Khám phá những tựa game đang có mức giảm giá tốt nhất và kiểm tra khu vực có giá thấp nhất.</p>
+        <div style="font-size: 13px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 8px; background: var(--surface-hover); padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);" id="dealsHeroMeta">
+          <span class="status-dot"></span> Đang tải dữ liệu...
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="deals-tabs-container" style="display: flex; justify-content: center; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
+        <div class="deals-tabs" style="display: flex; gap: 8px; background: var(--surface-elevated); padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <button class="btn active deal-tab-btn" data-category="specials" style="background: var(--primary-soft); color: var(--primary); border: 1px solid var(--primary-soft); border-radius: var(--radius-sm); font-weight: 600;">Khuyến mãi nổi bật</button>
+          <button class="btn deal-tab-btn" data-category="deep_discounts" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Giảm sâu nhất</button>
+          <button class="btn deal-tab-btn" data-category="free" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Game Miễn Phí</button>
+          <button class="btn deal-tab-btn" data-category="top_sellers" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Bán chạy</button>
+          <button class="btn deal-tab-btn" data-category="new_releases" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Mới giảm giá</button>
+        </div>
+      </div>
+
+      <!-- STICKY TOOLBAR -->
+      <div class="deals-toolbar" style="position: sticky; top: var(--header-height); z-index: 900; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; background: rgba(7, 11, 18, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 16px 0; margin-bottom: 32px; margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px;">
+        
+        <div style="display: flex; gap: 12px; flex: 1; min-width: 280px; align-items: center; flex-wrap: wrap;">
+          <div style="position: relative; flex: 1; max-width: 320px; min-width: 200px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="dealSearchInput" placeholder="Tìm tên game..." style="width: 100%; height: 44px; padding: 0 12px 0 40px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; color: var(--text-primary); outline: none; transition: var(--transition);">
+          </div>
+          
+          <select id="dealDiscountFilter" style="height: 44px; padding: 0 36px 0 16px; background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; color: var(--text-primary); appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23a7b2c3\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>'); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer;">
+            <option value="0">Tất cả mức giảm</option>
+            <option value="50">Từ 50%</option>
+            <option value="75">Từ 75%</option>
+            <option value="90">Từ 90%</option>
+          </select>
+        </div>
+        
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <select id="dealSortSelect" style="height: 44px; padding: 0 36px 0 16px; background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; color: var(--text-primary); appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23a7b2c3\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>'); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer;">
+            <option value="default">Nổi bật</option>
+            <option value="discount_desc">Giảm nhiều nhất</option>
+            <option value="price_asc">Giá thấp nhất</option>
+          </select>
+          
+          <div style="display: flex; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; height: 44px;">
+            <button class="btn icon-only deals-view-btn active" data-view="grid" style="background: var(--primary-soft); color: var(--primary); border: none; border-radius: 0; padding: 0 14px; height: 100%;"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></button>
+            <button class="btn icon-only deals-view-btn" data-view="list" style="background: transparent; color: var(--text-muted); border: none; border-radius: 0; padding: 0 14px; height: 100%;"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></button>
+          </div>
+        </div>
+        
+      </div>
+      
+      <!-- FEATURED DEALS (12-col grid) -->
+      <div id="dealsSpotlight" style="margin-bottom: 48px; display: none;"></div>
+      
+      <!-- SUB HEADER -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+        <div>
+          <h3 style="font-size: 22px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Ưu đãi tốt nhất hôm nay</h3>
+          <p style="color: var(--text-secondary); font-size: 14px;">Được xếp hạng theo mức giảm, giá hiện tại và lịch sử giá.</p>
+        </div>
+        <div style="font-size: 14px; color: var(--text-muted); font-weight: 500;" id="dealsResultCount">0 kết quả</div>
+      </div>
+      
+      <!-- LOADING STATE -->
+      <div id="dealsLoading" style="text-align: center; padding: 80px 0; color: var(--text-muted);">
+        <div class="spin-icon" style="display: inline-block; animation: spin 1s linear infinite; margin-bottom: 16px;">
+          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        </div>
+        <div style="font-size: 16px; font-weight: 500;">Đang cập nhật ưu đãi mới nhất...</div>
+      </div>
+      
+      <!-- EMPTY STATE -->
+      <div id="dealsEmpty" class="hidden" style="text-align: center; padding: 80px 0;">
+        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 24px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Không tìm thấy game phù hợp</h3>
+        <p style="color: var(--text-secondary); font-size: 15px; margin-bottom: 24px;">Hãy thử thay đổi từ khóa hoặc bỏ bớt bộ lọc.</p>
+        <button id="dealsResetFilterBtn" class="btn btn-secondary">Xóa tất cả bộ lọc</button>
+      </div>
+      
+      <!-- DEALS GRID -->
+      <div id="dealsGrid">
+        <!-- Injected by JS -->
+      </div>
+      
+      <!-- LOAD MORE -->
+      <div style="text-align: center; margin-top: 40px; display: none;" id="dealsLoadMoreContainer">
+        <button class="btn btn-secondary btn-large" style="min-width: 200px;">Xem thêm ưu đãi</button>
+      </div>
+      
+    </section>
+    
+    <!-- === TRACKER VIEW === -->
+    <section class="tp-page hidden" id="trackerView" aria-labelledby="tpPageTitle">
+      <div class="tp-page-header">
+        <div class="tp-header-copy">
+          <p class="tp-eyebrow">PRICE TRACKER</p>
+          <h1 id="tpPageTitle">Theo dõi giá game</h1>
+          <p>Lưu game, đặt mức giá mong muốn và kiểm tra chênh lệch giá giữa các khu vực Steam.</p>
+          <div class="tp-header-actions">
+            <button type="button" class="tp-button-primary" id="tpAddBtn">+ Thêm game</button>
+            <button type="button" class="tp-button-secondary" id="tpImportBtn">Nhập danh sách</button>
+            <button type="button" class="tp-button-secondary" id="tpExportBtn">Xuất dữ liệu</button>
+            <button type="button" class="tp-button-quiet" id="tpDataBtn">Dữ liệu cục bộ</button>
+            <input type="file" id="tpTrackerFileInput" accept=".json,application/json" hidden>
+          </div>
+        </div>
+        <div class="tp-header-overview" id="tpOverview" aria-label="Tổng quan danh sách"></div>
+      </div>
+
+      <div class="tp-summary" id="tpSummary" role="tablist" aria-label="Lọc nhanh theo trạng thái"></div>
+      <div class="tp-toolbar" id="tpToolbar"></div>
+      <div class="tp-smart-collections" id="tpCollections" aria-label="Bộ sưu tập"></div>
+      <div class="tp-content" id="tpContent"></div>
+    </section>
+
+    <!-- === GAME SHEET (Add/Edit) === -->
+    <div class="tp-layer-overlay" id="tpSheetOverlay"></div>
+    <aside class="tp-sheet" id="tpSheet" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpSheetTitle">
+      <header class="tp-sheet-header" id="tpSheetHeader"></header>
+      <div class="tp-sheet-body" id="tpSheetBody"></div>
+      <footer class="tp-sheet-footer" id="tpSheetFooter"></footer>
+    </aside>
+
+    <!-- === DETAIL DRAWER === -->
+    <div class="tp-layer-overlay" id="tpDrawerOverlay"></div>
+    <aside class="tp-drawer" id="tpDrawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpDrawerTitle">
+      <header class="tp-drawer-header" id="tpDrawerHeader"></header>
+      <div class="tp-drawer-tabs" id="tpDrawerTabs" role="tablist"></div>
+      <div class="tp-drawer-content" id="tpDrawerContent" role="tabpanel"></div>
+    </aside>
+
+    <!-- === LOCAL DATA MANAGEMENT === -->
+    <div class="tp-layer-overlay" id="tpDataOverlay"></div>
+    <section class="tp-data-modal" id="tpDataModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpDataTitle"></section>
+
+    <!-- === CONFIRM DIALOG === -->
+    <div class="tp-dialog-overlay" id="tpDialogOverlay"></div>
+    <div class="tp-dialog" id="tpDialog" role="alertdialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpDialogTitle">
+      <h3 class="tp-dialog-title" id="tpDialogTitle"></h3>
+      <p class="tp-dialog-message" id="tpDialogMessage"></p>
+      <div class="tp-dialog-actions">
+        <button type="button" class="tp-dialog-btn-cancel" id="tpDialogCancelBtn">Hủy</button>
+        <button type="button" class="tp-dialog-btn-danger" id="tpDialogConfirmBtn">Xác nhận</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile Bottom Sheet Overlays -->
+  <div class="overlay hidden" id="mobileOverlay"></div>
+  
+  <div class="bottom-sheet" id="currencyBottomSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 data-i18n="sheet_title">Chọn tiền tệ quy đổi</h3>
+      <button class="icon-btn" id="closeSheetBtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+    <div class="sheet-search">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" id="sheetSearchInput" data-i18n="sheet_search" placeholder="Tìm theo mã hoặc tên...">
+    </div>
+    <div class="sheet-content" id="sheetCurrencyList">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <!-- Price History Modal for the Compare tab -->
+  <div class="overlay hidden" id="historyModalOverlay"></div>
+  <div class="modal hidden" id="historyModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="historyModalTitle">
+    <div class="modal-header">
+      <h3 id="historyModalTitle" data-i18n="price_history">Lịch sử giá</h3>
+      <button type="button" class="icon-btn" id="closeHistoryBtn" aria-label="Đóng lịch sử giá"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="history-source-switch" role="tablist" aria-label="Nguồn dữ liệu lịch sử">
+        <button type="button" class="history-source-btn active" data-history-source="real" role="tab" aria-selected="true">API thật</button>
+        <button type="button" class="history-source-btn" data-history-source="simulated" role="tab" aria-selected="false">Mô phỏng</button>
+      </div>
+      <div class="chart-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <p style="font-size: 12px; color: var(--text-muted);">Dữ liệu tham khảo từ IsThereAnyDeal</p>
+        <div class="chart-filters" style="display: flex; gap: 8px;">
+          <button class="btn btn-outline btn-small filter-btn active" data-range="12" data-i18n="history_range_1y">1 Năm</button>
+          <button class="btn btn-outline btn-small filter-btn" data-range="6" data-i18n="history_range_6m">6 Tháng</button>
+          <button class="btn btn-outline btn-small filter-btn" data-range="3" data-i18n="history_range_3m">3 Tháng</button>
+        </div>
+      </div>
+      <div id="chartLoadingIndicator" class="hidden" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+        <div class="spin-icon" style="display: inline-block; animation: spin 1s linear infinite; margin-bottom: 8px;">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        </div>
+        <div data-i18n="history_loading_real">Đang tải dữ liệu thật từ máy chủ...</div>
+      </div>
+      <div class="chart-container" style="position: relative; height:300px; width:100%">
+        <canvas id="priceHistoryChart"></canvas>
+      </div>
+      <p class="history-note-real" data-i18n="history_note_real" style="margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center;">* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại.</p>
+      <p class="history-note-simulated hidden">Dữ liệu mô phỏng từ mức giá hiện tại, chỉ dùng để xem thử xu hướng và không phải lịch sử giá Steam.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="modules/tracker/tracker-page.js?v=21"></script>
+  <script src="app.js?v=12"></script>
+</body>
+</html>
