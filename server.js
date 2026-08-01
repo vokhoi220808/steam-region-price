@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import "dotenv/config";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,20 +48,61 @@ const REGIONS = [
 
 
 const cache = new Map();
+const cacheStats = { hits: 0, misses: 0, evictions: 0 };
+const CACHE_MAX_ENTRIES = 1200;
 const PRICE_TTL = 20 * 60 * 1000;
 const FX_TTL = 6 * 60 * 60 * 1000;
+const DEALS_TTL = 5 * 60 * 1000;
+const METADATA_TTL = 6 * 60 * 60 * 1000;
+const LIVE_STATS_TTL = 5 * 60 * 1000;
+
+const STEAM_SALE_EVENTS = [
+  { id: "cyberpunk-2026", name: "Cyberpunk Fest", kind: "festival", start: "2026-08-03T17:00:00Z", end: "2026-08-10T17:00:00Z" },
+  { id: "pins-pegs-2026", name: "Pins & Pegs Fest", kind: "festival", start: "2026-08-17T17:00:00Z", end: "2026-08-20T17:00:00Z" },
+  { id: "pve-survival-2026", name: "PvE Survival Crafting Fest", kind: "festival", start: "2026-08-31T17:00:00Z", end: "2026-09-07T17:00:00Z" },
+  { id: "programming-2026", name: "Programming Fest", kind: "festival", start: "2026-09-10T17:00:00Z", end: "2026-09-14T17:00:00Z" },
+  { id: "party-rpg-2026", name: "Party-Based RPG Fest", kind: "festival", start: "2026-09-14T17:00:00Z", end: "2026-09-21T17:00:00Z" },
+  { id: "autumn-2026", name: "Steam Autumn Sale", kind: "seasonal", start: "2026-10-01T17:00:00Z", end: "2026-10-08T17:00:00Z" },
+  { id: "cooking-2026", name: "Cooking Fest", kind: "festival", start: "2026-10-12T17:00:00Z", end: "2026-10-19T17:00:00Z" },
+  { id: "next-oct-2026", name: "Steam Next Fest", kind: "next_fest", start: "2026-10-19T17:00:00Z", end: "2026-10-26T17:00:00Z" },
+  { id: "scream-2026", name: "Steam Scream V", kind: "festival", start: "2026-10-26T17:00:00Z", end: "2026-11-02T18:00:00Z" },
+  { id: "auto-battler-2026", name: "Auto-Battler RPG Fest", kind: "festival", start: "2026-11-16T18:00:00Z", end: "2026-11-23T18:00:00Z" },
+  { id: "winter-2026", name: "Steam Winter Sale", kind: "seasonal", start: "2026-12-17T18:00:00Z", end: "2027-01-04T18:00:00Z" },
+  { id: "spring-2027", name: "Steam Spring Sale", kind: "seasonal", start: "2027-03-18T17:00:00Z", end: "2027-03-25T17:00:00Z" },
+  { id: "summer-2027", name: "Steam Summer Sale", kind: "seasonal", start: "2027-06-24T17:00:00Z", end: "2027-07-08T17:00:00Z" }
+];
 
 function getCache(key) {
   const item = cache.get(key);
   if (!item || item.expiresAt < Date.now()) {
     cache.delete(key);
+    cacheStats.misses += 1;
     return null;
   }
+  cacheStats.hits += 1;
   return item.value;
 }
 
 function setCache(key, value, ttl) {
+  if (!cache.has(key) && cache.size >= CACHE_MAX_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+    cacheStats.evictions += 1;
+  }
   cache.set(key, { value, expiresAt: Date.now() + ttl });
+}
+
+async function mapWithConcurrency(values, limit, mapper) {
+  const results = new Array(values.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < values.length) {
+      const index = cursor++;
+      results[index] = await mapper(values[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+  return results;
 }
 
 function minorToMajor(value, currency) {
@@ -194,6 +236,141 @@ async function getRegionalPrice(appId, region, language = "vietnamese") {
   }
 }
 
+function stripSteamMarkup(value = "") {
+  return String(value)
+    .replace(/\[\/?[a-z]+(?:=[^\]]+)?\]/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function getRegionalPackagePrice(packageId, region, language = "vietnamese") {
+  const steamLanguage = language === "english" ? "english" : "vietnamese";
+  const cacheKey = `package:${packageId}:${region.code}:${steamLanguage}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
+  const params = new URLSearchParams({
+    packageids: String(packageId),
+    cc: region.code,
+    l: steamLanguage
+  });
+
+  try {
+    const json = await fetchJson(`https://store.steampowered.com/api/packagedetails?${params.toString()}`);
+    const result = json?.[String(packageId)];
+    if (!result?.success || !result.data) {
+      const unavailable = { ...region, available: false, productType: "sub" };
+      setCache(cacheKey, unavailable, PRICE_TTL);
+      return unavailable;
+    }
+
+    const product = result.data;
+    const price = product.price;
+    const item = {
+      ...region,
+      productType: "sub",
+      available: Boolean(price),
+      isFree: Boolean(price && price.final === 0),
+      gameName: product.name,
+      image: product.header_image || product.small_logo || null,
+      developer: null,
+      publisher: null,
+      releaseDate: product.release_date?.date || null,
+      genres: "Bundle / Complete Edition",
+      shortDescription: stripSteamMarkup(product.page_content).slice(0, 420) || null,
+      includedApps: product.apps?.map((entry) => ({ id: entry.id, name: entry.name })) || [],
+      currency: price?.currency || null,
+      initial: price ? minorToMajor(price.initial, price.currency) : null,
+      final: price ? minorToMajor(price.final, price.currency) : null,
+      discountPercent: price?.discount_percent || 0,
+      initialFormatted: null,
+      finalFormatted: null
+    };
+    setCache(cacheKey, item, PRICE_TTL);
+    return item;
+  } catch (error) {
+    return { ...region, available: false, productType: "sub", error: error.message };
+  }
+}
+
+async function getPackageMetadata(packageId, includedApps = [], language = "vietnamese") {
+  const baseAppId = Number(includedApps[0]?.id);
+  if (!Number.isFinite(baseAppId)) return null;
+
+  const steamLanguage = language === "english" ? "english" : "vietnamese";
+  const cacheKey = `package-meta:${packageId}:${steamLanguage}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const params = new URLSearchParams({
+      appids: String(baseAppId),
+      cc: "US",
+      l: steamLanguage
+    });
+    const json = await fetchJson(`https://store.steampowered.com/api/appdetails?${params.toString()}`);
+    const game = json?.[String(baseAppId)]?.data;
+    if (!game) return null;
+
+    const metadata = {
+      developer: game.developers?.join(", ") || null,
+      publisher: game.publishers?.join(", ") || null,
+      releaseDate: game.release_date?.date || null,
+      genres: game.genres?.map((genre) => genre.description).join(", ") || "Bundle / Complete Edition",
+      shortDescription: game.short_description || null
+    };
+    setCache(cacheKey, metadata, METADATA_TTL);
+    return metadata;
+  } catch {
+    return null;
+  }
+}
+
+async function getDealMetadata(appId) {
+  const stableKey = `deal-meta:${appId}`;
+  const liveKey = `deal-live:${appId}`;
+  let stable = getCache(stableKey);
+  if (!stable) {
+    const params = new URLSearchParams({
+      appids: String(appId),
+      cc: "US",
+      l: "english",
+      filters: "basic,genres,categories"
+    });
+    const [detailsResult, reviewsResult] = await Promise.allSettled([
+      fetchJson(`https://store.steampowered.com/api/appdetails?${params.toString()}`),
+      fetchJson(`https://store.steampowered.com/appreviews/${appId}?json=1&language=all&purchase_type=all&num_per_page=0`)
+    ]);
+    const details = detailsResult.status === "fulfilled" ? detailsResult.value?.[String(appId)]?.data : null;
+    const reviews = reviewsResult.status === "fulfilled" ? reviewsResult.value?.query_summary : null;
+    stable = {
+      appId: Number(appId),
+      contentType: details?.type || "game",
+      tags: details?.genres?.map((genre) => genre.description) || [],
+      reviewScore: reviews?.review_score || 0,
+      reviewScoreDesc: reviews?.review_score_desc || null,
+      totalReviews: reviews?.total_reviews || 0
+    };
+    setCache(stableKey, stable, METADATA_TTL);
+  }
+
+  let live = getCache(liveKey);
+  if (!live) {
+    try {
+      const players = await fetchJson(`https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${appId}`);
+      live = { ccu: players?.response?.player_count || 0 };
+    } catch {
+      live = { ccu: 0 };
+    }
+    setCache(liveKey, live, LIVE_STATS_TTL);
+  }
+  return { ...stable, ...live };
+}
+
 app.get("/api/regions", (req, res) => {
   res.json(REGIONS);
 });
@@ -202,7 +379,8 @@ app.get("/api/search", async (req, res) => {
   const query = req.query.q;
   if (!query) return res.status(400).json({ error: "Missing search term" });
   try {
-    const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=english&cc=US`;
+    const language = String(req.query.lang || "vi").toLowerCase() === "en" ? "english" : "vietnamese";
+    const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=${language}&cc=US`;
     const response = await fetchJson(url);
     res.json(response);
   } catch (error) {
@@ -218,6 +396,7 @@ app.get("/api/compare/:appId", async (req, res) => {
   }
 
   const targetCurrency = String(req.query.currency || "VND").toUpperCase();
+  const productType = String(req.query.type || "app").toLowerCase() === "sub" ? "sub" : "app";
   const language = String(req.query.lang || "vi").toLowerCase() === "en"
     ? "english"
     : "vietnamese";
@@ -236,9 +415,18 @@ app.get("/api/compare/:appId", async (req, res) => {
   }
 
   const [prices, rates] = await Promise.all([
-    Promise.all(selectedRegions.map((region) => getRegionalPrice(appId, region, language))),
+    Promise.all(selectedRegions.map((region) => productType === "sub"
+      ? getRegionalPackagePrice(appId, region, language)
+      : getRegionalPrice(appId, region, language))),
     getExchangeRates(targetCurrency)
   ]);
+
+  const packageSeed = productType === "sub"
+    ? prices.find((item) => item.available && item.includedApps?.length)
+    : null;
+  const packageMetadata = packageSeed
+    ? await getPackageMetadata(appId, packageSeed.includedApps, language)
+    : null;
 
   const normalized = prices.map((item) => {
     let convertedValue = null;
@@ -269,13 +457,15 @@ app.get("/api/compare/:appId", async (req, res) => {
   const firstValue = (field) => enriched.find((item) => item[field])?.[field] || null;
   res.json({
     appId: Number(appId),
+    productType,
     gameName: firstValue("gameName"),
     image: firstValue("image"),
-    developer: firstValue("developer"),
-    publisher: firstValue("publisher"),
-    releaseDate: firstValue("releaseDate"),
-    genres: firstValue("genres"),
-    shortDescription: firstValue("shortDescription"),
+    developer: firstValue("developer") || packageMetadata?.developer || null,
+    publisher: firstValue("publisher") || packageMetadata?.publisher || null,
+    releaseDate: firstValue("releaseDate") || packageMetadata?.releaseDate || null,
+    genres: packageMetadata?.genres || firstValue("genres"),
+    shortDescription: firstValue("shortDescription") || packageMetadata?.shortDescription || null,
+    includedApps: firstValue("includedApps") || [],
     fxAvailable: Boolean(rates),
     checkedAt: new Date().toISOString(),
     prices: enriched
@@ -283,6 +473,7 @@ app.get("/api/compare/:appId", async (req, res) => {
 });
 
 const ITAD_API_KEY = process.env.ITAD_API_KEY || "";
+const STEAM_API_KEY = process.env.STEAM_API_KEY || "";
 
 app.get("/api/history/:appId", async (req, res) => {
   const appId = req.params.appId;
@@ -322,10 +513,14 @@ app.get("/api/history/:appId", async (req, res) => {
 
 app.get('/api/deals', async (req, res) => {
   try {
-    const cc = req.query.cc || 'VN';
+    const cc = String(req.query.cc || 'VN').toUpperCase();
+    const cacheKey = `deals:${cc}`;
+    const cached = getCache(cacheKey);
+    if (cached) return res.json(cached);
     const dealsUrl = `https://store.steampowered.com/api/featuredcategories?cc=${cc}`;
     const data = await fetchJson(dealsUrl);
     if (data) {
+      setCache(cacheKey, data, DEALS_TTL);
       res.json(data);
     } else {
       res.status(500).json({ error: "Invalid data from Steam" });
@@ -334,6 +529,91 @@ app.get('/api/deals', async (req, res) => {
     console.error("Steam Deals API Error:", err.message);
     res.status(500).json({ error: "Failed to fetch top deals" });
   }
+});
+
+app.get('/api/deals/metadata', async (req, res) => {
+  const appIds = [...new Set(String(req.query.appids || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => /^\d+$/.test(value)))]
+    .slice(0, 30);
+  if (!appIds.length) return res.json({ items: [] });
+  const items = await mapWithConcurrency(appIds, 4, async (appId) => {
+    try {
+      return await getDealMetadata(appId);
+    } catch (error) {
+      return { appId: Number(appId), error: error.message };
+    }
+  });
+  res.json({ items, partial: String(req.query.appids || "").split(",").length > appIds.length });
+});
+
+app.get('/api/sales-calendar', (req, res) => {
+  const now = Date.now();
+  const events = STEAM_SALE_EVENTS.filter((event) => new Date(event.end).getTime() > now);
+  res.json({
+    checkedAt: new Date().toISOString(),
+    source: "https://partner.steamgames.com/doc/marketing/upcoming_events",
+    events
+  });
+});
+
+async function resolveSteamId(profileInput) {
+  const input = String(profileInput || "").trim();
+  const direct = input.match(/(?:profiles\/)?(7656119\d{10})/);
+  if (direct) return direct[1];
+  const vanity = input.match(/steamcommunity\.com\/id\/([^/?#]+)/i)?.[1]
+    || (/^[a-z0-9_-]{2,64}$/i.test(input) ? input : null);
+  if (!vanity) return null;
+  const xml = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(vanity)}/?xml=1`, {
+    headers: { "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
+    signal: AbortSignal.timeout(12000)
+  }).then((response) => response.ok ? response.text() : "");
+  return xml.match(/<steamID64>(\d+)<\/steamID64>/)?.[1] || null;
+}
+
+app.get('/api/wishlist', async (req, res) => {
+  if (!STEAM_API_KEY) {
+    return res.status(503).json({ error: "STEAM_API_KEY chưa được cấu hình trên máy chủ." });
+  }
+  try {
+    const steamId = await resolveSteamId(req.query.profile);
+    if (!steamId) return res.status(400).json({ error: "Steam ID hoặc Profile Link không hợp lệ." });
+    const params = new URLSearchParams({ key: STEAM_API_KEY, steamid: steamId });
+    const wishlist = await fetchJson(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?${params.toString()}`);
+    const rawItems = wishlist?.response?.items || wishlist?.response?.apps || [];
+    const ids = [...new Set(rawItems.map((item) => Number(item.appid || item.app_id || item)).filter(Number.isInteger))];
+    const selected = ids.slice(0, 200);
+    const games = await mapWithConcurrency(selected, 5, async (appId) => {
+      const cacheKey = `wishlist-app:${appId}`;
+      const cached = getCache(cacheKey);
+      if (cached) return cached;
+      try {
+        const params = new URLSearchParams({ appids: String(appId), cc: "VN", l: "vietnamese", filters: "basic,genres" });
+        const details = await fetchJson(`https://store.steampowered.com/api/appdetails?${params.toString()}`);
+        const game = details?.[String(appId)]?.data;
+        const item = {
+          appId,
+          name: game?.name || `Steam App ${appId}`,
+          headerImage: game?.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+          tags: game?.genres?.map((genre) => genre.description) || [],
+          steamUrl: `https://store.steampowered.com/app/${appId}`
+        };
+        setCache(cacheKey, item, METADATA_TTL);
+        return item;
+      } catch {
+        return { appId, name: `Steam App ${appId}`, headerImage: "", tags: [], steamUrl: `https://store.steampowered.com/app/${appId}` };
+      }
+    });
+    res.json({ steamId, total: ids.length, limited: ids.length > selected.length, games });
+  } catch (error) {
+    console.error("Steam Wishlist Error:", error.message);
+    res.status(502).json({ error: "Không thể đồng bộ wishlist. Hãy kiểm tra quyền riêng tư và Steam API key." });
+  }
+});
+
+app.get('/api/cache/status', (req, res) => {
+  res.json({ type: "memory", entries: cache.size, maxEntries: CACHE_MAX_ENTRIES, ...cacheStats });
 });
 
 app.get(/.*/, (req, res) => {

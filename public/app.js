@@ -6,6 +6,7 @@
 // --- MODEL / STATE ---
 const state = {
   currentData: null,
+  selectedProductType: "app",
   region: (localStorage.getItem("steam_region") || "VN").toUpperCase(),
   currency: localStorage.getItem("steam_target_currency") || "VND",
   pinnedVN: false,
@@ -344,12 +345,20 @@ function formatCurrency(val, code) {
 function setInlineFieldError(input, message) {
   if (!input) return;
   input.setAttribute("aria-invalid", "true");
-  let error = input.closest("form, .search-container, .setup-card")?.querySelector(".inline-field-error");
+  const isMainSearch = input.id === "searchInput";
+  const scope = isMainSearch
+    ? input.closest(".search-container")
+    : input.closest("form, .setup-card");
+  let error = scope?.querySelector(".inline-field-error");
   if (!error) {
     error = document.createElement("p");
     error.className = "inline-field-error";
     error.setAttribute("aria-live", "polite");
-    input.closest(".search-input-group, .region-controls, form")?.insertAdjacentElement("afterend", error);
+    if (isMainSearch) {
+      input.closest(".search-input-group")?.insertAdjacentElement("afterend", error);
+    } else {
+      input.closest(".region-controls, form")?.insertAdjacentElement("afterend", error);
+    }
   }
   if (error) error.textContent = message;
   input.addEventListener("input", () => {
@@ -361,7 +370,10 @@ function setInlineFieldError(input, message) {
 function clearInlineFieldError(input) {
   if (!input) return;
   input.removeAttribute("aria-invalid");
-  input.closest("form, .search-container, .setup-card")
+  const scope = input.id === "searchInput"
+    ? input.closest(".search-container")
+    : input.closest("form, .setup-card");
+  scope
     ?.querySelector(".inline-field-error")
     ?.remove();
 }
@@ -440,6 +452,7 @@ async function init() {
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
   const appIdParam = urlParams.get('appId');
+  state.selectedProductType = urlParams.get('type') === 'sub' ? 'sub' : 'app';
   if (appIdParam) {
     document.getElementById("searchInput").value = appIdParam;
     fetchRealData(appIdParam);
@@ -676,12 +689,97 @@ let dealsState = {
   sort: "default",
   view: "grid",
   discountFilter: "0",
+  reviewFilter: "0",
+  genreFilter: "all",
+  ccuFilter: "0",
+  contentFilter: "all",
+  metadataLoading: false,
   page: 1,
   itemsPerPage: 12
 };
 
+let saleCalendarData = null;
+let dealsEventsReady = false;
+
+function formatCountdown(milliseconds) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function renderSaleCalendar() {
+  const grid = document.getElementById("saleCalendarGrid");
+  const loading = document.getElementById("saleCalendarLoading");
+  if (!grid || !saleCalendarData?.events?.length) return;
+  const now = Date.now();
+  const events = saleCalendarData.events.slice(0, 4);
+  const valveDate = { day: "2-digit", month: "2-digit", timeZone: "America/Los_Angeles" };
+  grid.innerHTML = events.map((event, index) => {
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    const active = start.getTime() <= now && end.getTime() > now;
+    const target = active ? end : start;
+    return `<article class="sale-event ${index === 0 ? "is-next" : ""}" data-sale-target="${target.toISOString()}">
+      <span class="sale-event-label">${active ? "Đang diễn ra" : (index === 0 ? "Sự kiện tiếp theo" : event.kind === "seasonal" ? "Seasonal Sale" : "Festival")}</span>
+      <h4 title="${event.name}">${event.name}</h4>
+      <div class="sale-event-date">${start.toLocaleDateString("vi-VN", valveDate)} – ${end.toLocaleDateString("vi-VN", { ...valveDate, year: "numeric" })} (PT)</div>
+      <div class="sale-countdown">${active ? "Kết thúc sau " : "Còn "}${formatCountdown(target.getTime() - now)}</div>
+    </article>`;
+  }).join("");
+  loading?.classList.add("hidden");
+  grid.classList.remove("hidden");
+}
+
+async function fetchSaleCalendar() {
+  if (saleCalendarData) return renderSaleCalendar();
+  try {
+    const response = await fetch("/api/sales-calendar");
+    if (!response.ok) throw new Error("Calendar unavailable");
+    saleCalendarData = await response.json();
+    renderSaleCalendar();
+  } catch {
+    const loading = document.getElementById("saleCalendarLoading");
+    if (loading) loading.innerHTML = `<span style="height:auto;padding:12px;color:var(--text-muted)">Chưa thể tải lịch sự kiện.</span>`;
+  }
+}
+
+async function loadDealMetadataForCurrentCategory() {
+  const items = dealsData?.[dealsState.category]?.items || [];
+  const missingIds = items
+    .filter((item) => !item.isGamerPower && !item.metadataLoaded)
+    .map((item) => item.id)
+    .filter(Number.isFinite)
+    .slice(0, 30);
+  if (!missingIds.length || dealsState.metadataLoading) return;
+  dealsState.metadataLoading = true;
+  try {
+    const response = await fetch(`/api/deals/metadata?appids=${missingIds.join(",")}`);
+    if (!response.ok) throw new Error("Metadata unavailable");
+    const metadata = await response.json();
+    const byId = new Map(metadata.items.map((item) => [Number(item.appId), item]));
+    Object.values(dealsData).forEach((category) => {
+      category?.items?.forEach((item) => {
+        const extra = byId.get(Number(item.id));
+        if (extra) Object.assign(item, extra, { metadataLoaded: true });
+      });
+    });
+    renderDealsView();
+  } catch (error) {
+    console.warn("Deal metadata failed:", error);
+  } finally {
+    dealsState.metadataLoading = false;
+  }
+}
+
 async function fetchTopDeals(force = false) {
-  if (dealsData && !force) return;
+  fetchSaleCalendar();
+  if (dealsData && !force) {
+    loadDealMetadataForCurrentCategory();
+    return;
+  }
   const loading = document.getElementById("dealsLoading");
   const grid = document.getElementById("dealsGrid");
   const spotlight = document.getElementById("dealsSpotlight");
@@ -763,6 +861,7 @@ async function fetchTopDeals(force = false) {
     // Initial Render
     renderDealsView(); 
     setupDealsEvents();
+    loadDealMetadataForCurrentCategory();
   } catch (err) {
     loading.innerHTML = `<div style="color: var(--danger); font-weight: 500;">Không thể tải danh sách khuyến mãi lúc này. Hãy thử lại sau.</div>`;
     console.error(err);
@@ -795,6 +894,20 @@ function renderDealsView() {
   if (minDiscount > 0) {
     items = items.filter(d => d.discount_percent >= minDiscount);
   }
+
+  const minReview = Number(dealsState.reviewFilter) || 0;
+  if (minReview > 0) items = items.filter((deal) => Number(deal.reviewScore) >= minReview);
+  if (dealsState.genreFilter !== "all") {
+    const genre = dealsState.genreFilter.toLowerCase();
+    items = items.filter((deal) => (deal.tags || []).some((tag) => tag.toLowerCase().includes(genre)));
+  }
+  const minCcu = Number(dealsState.ccuFilter) || 0;
+  if (minCcu > 0) items = items.filter((deal) => Number(deal.ccu) >= minCcu);
+  if (dealsState.contentFilter !== "all") {
+    items = items.filter((deal) => dealsState.contentFilter === "dlc"
+      ? deal.contentType === "dlc"
+      : deal.contentType !== "dlc");
+  }
   
   // 3. SORT
   if (dealsState.sort === "discount_desc") {
@@ -811,7 +924,9 @@ function renderDealsView() {
   spotlightContainer.style.display = "none";
   spotlightContainer.innerHTML = "";
   
-  const isDefaultView = !dealsState.search && minDiscount === 0 && dealsState.sort === "default";
+  const isDefaultView = !dealsState.search && minDiscount === 0 && minReview === 0
+    && dealsState.genreFilter === "all" && minCcu === 0
+    && dealsState.contentFilter === "all" && dealsState.sort === "default";
   
   if (items.length >= 3 && isDefaultView && dealsState.category !== "deep_discounts") {
     // Extract top 3 deals for the 12-col spotlight (1 big 8-col, 2 small 4-col)
@@ -970,6 +1085,12 @@ function generateDealCardHTML(deal, index) {
         </div>
         
         ${regionHtml ? `<div class="dc-region">${regionHtml}</div>` : ''}
+        ${deal.metadataLoaded ? `<div class="deal-meta-row">
+          ${deal.reviewScoreDesc ? `<span class="deal-meta-pill">${deal.reviewScoreDesc}</span>` : ''}
+          ${deal.ccu ? `<span class="deal-meta-pill">${Number(deal.ccu).toLocaleString("vi-VN")} CCU</span>` : ''}
+          ${(deal.tags || []).slice(0, 2).map(tag => `<span class="deal-meta-pill">${tag}</span>`).join("")}
+          ${deal.contentType === "dlc" ? `<span class="deal-meta-pill">DLC</span>` : ''}
+        </div>` : ''}
       </div>
     </div>
   `;
@@ -1000,12 +1121,15 @@ function attachDealClickListeners(elements) {
       document.getElementById("navCompareBtn").click();
       document.getElementById("searchInput").value = appId;
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      fetchRealData(appId);
+      state.selectedProductType = "app";
+      fetchRealData(appId, "app");
     });
   });
 }
 
 function setupDealsEvents() {
+  if (dealsEventsReady) return;
+  dealsEventsReady = true;
   // Tabs
   document.querySelectorAll(".deal-tab-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
@@ -1026,6 +1150,7 @@ function setupDealsEvents() {
       dealsState.category = t.dataset.category;
       dealsState.page = 1;
       renderDealsView();
+      loadDealMetadataForCurrentCategory();
     });
   });
   
@@ -1043,6 +1168,19 @@ function setupDealsEvents() {
   document.getElementById("dealDiscountFilter").addEventListener("change", (e) => {
     dealsState.discountFilter = e.target.value;
     renderDealsView();
+  });
+
+  [
+    ["dealReviewFilter", "reviewFilter"],
+    ["dealGenreFilter", "genreFilter"],
+    ["dealCcuFilter", "ccuFilter"],
+    ["dealContentFilter", "contentFilter"]
+  ].forEach(([id, key]) => {
+    document.getElementById(id)?.addEventListener("change", (event) => {
+      dealsState[key] = event.target.value;
+      renderDealsView();
+      loadDealMetadataForCurrentCategory();
+    });
   });
   
   document.getElementById("dealSortSelect").addEventListener("change", (e) => {
@@ -1073,9 +1211,17 @@ function setupDealsEvents() {
     document.getElementById("dealSearchInput").value = "";
     document.getElementById("dealDiscountFilter").value = "0";
     document.getElementById("dealSortSelect").value = "default";
+    document.getElementById("dealReviewFilter").value = "0";
+    document.getElementById("dealGenreFilter").value = "all";
+    document.getElementById("dealCcuFilter").value = "0";
+    document.getElementById("dealContentFilter").value = "all";
     
     dealsState.search = "";
     dealsState.discountFilter = "0";
+    dealsState.reviewFilter = "0";
+    dealsState.genreFilter = "all";
+    dealsState.ccuFilter = "0";
+    dealsState.contentFilter = "all";
     dealsState.sort = "default";
     renderDealsView();
   });
@@ -1227,6 +1373,7 @@ function setupEvents() {
   let searchTimeout;
 
   searchInput.addEventListener("input", (e) => {
+    state.selectedProductType = "app";
     const val = e.target.value.trim();
     if (val) clearSearchBtn.classList.remove("hidden");
     else clearSearchBtn.classList.add("hidden");
@@ -1238,14 +1385,14 @@ function setupEvents() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(val)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(val)}&lang=${state.lang}`);
         const data = await res.json();
         if (data && data.items && data.items.length > 0) {
           autocompleteDropdown.innerHTML = data.items.map(item => `
-            <div class="autocomplete-item" data-id="${item.id}">
+            <div class="autocomplete-item" data-id="${item.id}" data-type="${item.type === "sub" ? "sub" : "app"}">
               <img src="${item.tiny_image}" alt="" class="ac-img" />
               <div class="ac-info">
-                <div class="ac-name">${item.name}</div>
+                <div class="ac-name">${item.name} <span class="ac-type">${item.type === "sub" ? "BUNDLE" : "APP"}</span></div>
                 ${item.price ? `<div class="ac-price">${item.price.currency} ${(item.price.final/100).toFixed(2)}</div>` : ""}
               </div>
             </div>
@@ -1255,9 +1402,10 @@ function setupEvents() {
           autocompleteDropdown.querySelectorAll(".autocomplete-item").forEach(el => {
             el.addEventListener("click", () => {
               searchInput.value = el.dataset.id;
+              state.selectedProductType = el.dataset.type || "app";
               clearInlineFieldError(searchInput);
               autocompleteDropdown.classList.add("hidden");
-              fetchRealData(el.dataset.id);
+              fetchRealData(el.dataset.id, state.selectedProductType);
             });
           });
         } else {
@@ -1281,6 +1429,16 @@ function setupEvents() {
     clearSearchBtn.classList.add("hidden");
     autocompleteDropdown.classList.add("hidden");
     searchInput.focus();
+  });
+
+  document.querySelectorAll(".chip-btn[data-appid]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedProductType = "app";
+      searchInput.value = button.dataset.appid;
+      clearSearchBtn.classList.remove("hidden");
+      clearInlineFieldError(searchInput);
+      fetchRealData(button.dataset.appid, "app");
+    });
   });
 
   document.getElementById("pasteBtn").addEventListener("click", async () => {
@@ -1479,19 +1637,32 @@ function updateDealsCountdowns() {
       }
     }
   });
+
+  document.querySelectorAll('.sale-event[data-sale-target]').forEach((event) => {
+    const target = new Date(event.dataset.saleTarget).getTime();
+    const output = event.querySelector('.sale-countdown');
+    if (!output || !Number.isFinite(target)) return;
+    const active = event.querySelector('.sale-event-label')?.textContent === 'Đang diễn ra';
+    output.textContent = `${active ? 'Kết thúc sau ' : 'Còn '}${formatCountdown(target - Date.now())}`;
+  });
 }
 
-async function fetchRealData(query) {
+async function fetchRealData(query, requestedType = null) {
   const searchInput = document.getElementById("searchInput");
   let appId = String(query || "").trim();
-  const steamUrlMatch = appId.match(/app\/(\d+)/);
-  if (steamUrlMatch) appId = steamUrlMatch[1];
+  const steamUrlMatch = appId.match(/(?:^|\/)(app|sub)\/(\d+)/i);
+  let productType = requestedType === "sub" ? "sub" : state.selectedProductType;
+  if (steamUrlMatch) {
+    productType = steamUrlMatch[1].toLowerCase() === "sub" ? "sub" : "app";
+    appId = steamUrlMatch[2];
+  }
   else if (!/^\d+$/.test(appId)) {
     setInlineFieldError(searchInput, state.lang === "vi" ? "Vui lòng nhập App ID hợp lệ" : "Please enter a valid App ID");
     return;
   }
   clearInlineFieldError(searchInput);
   searchInput.value = appId;
+  state.selectedProductType = productType;
   
   if (selectedRegions.size === 0) {
     setInlineFieldError(document.getElementById("regionSearchInput"), "Vui lòng chọn ít nhất một khu vực");
@@ -1514,7 +1685,7 @@ async function fetchRealData(query) {
   loadingState.scrollIntoView({ behavior: "smooth", block: "center" });
   
   try {
-    const res = await fetch(`/api/compare/${appId}?currency=${state.currency}&regions=${regionCodes}&lang=${state.lang}`);
+    const res = await fetch(`/api/compare/${appId}?currency=${state.currency}&regions=${regionCodes}&lang=${state.lang}&type=${productType}`);
     if (!res.ok) throw new Error("Lỗi tải dữ liệu");
     const data = await res.json();
     
@@ -1535,6 +1706,7 @@ async function fetchRealData(query) {
     
     state.currentData = {
       appId: data.appId,
+      productType: data.productType || productType,
       name: data.gameName || "Trò chơi chưa xác định",
       image: data.image || "",
       developer: data.developer || data.publisher || t("unknown"),
@@ -1558,6 +1730,8 @@ async function fetchRealData(query) {
     // Update URL for sharing
     const url = new URL(window.location);
     url.searchParams.set('appId', appId);
+    if (productType === "sub") url.searchParams.set('type', 'sub');
+    else url.searchParams.delete('type');
     window.history.pushState({}, '', url);
     
   } catch (error) {
@@ -1660,7 +1834,8 @@ function renderData() {
   document.getElementById("gameId").textContent = state.currentData.appId;
   document.getElementById("gameDescription").textContent = state.currentData.description;
   document.getElementById("gameTags").innerHTML = state.currentData.tags.map(t => `<span class="tag">${t}</span>`).join("");
-  document.getElementById("gameSteamLinkBtn").href = `https://store.steampowered.com/app/${state.currentData.appId}`;
+  const storePath = state.currentData.productType === "sub" ? "sub" : "app";
+  document.getElementById("gameSteamLinkBtn").href = `https://store.steampowered.com/${storePath}/${state.currentData.appId}`;
   
   // Track Game Logic
   updateTrackBtnUI(state.currentData.appId);
@@ -1669,9 +1844,19 @@ function renderData() {
     // Xoá sự kiện cũ để tránh lặp (bằng cách clone)
     const newTrackBtn = trackBtn.cloneNode(true);
     trackBtn.parentNode.replaceChild(newTrackBtn, trackBtn);
-    newTrackBtn.addEventListener("click", () => {
-      toggleTrackGame(state.currentData.appId, state.currentData.name, state.currentData.image);
-    });
+    const isPackage = state.currentData.productType === "sub";
+    newTrackBtn.disabled = isPackage;
+    newTrackBtn.title = isPackage ? "Theo dõi từng game/DLC trong gói" : "Đưa vào Radar Theo Dõi Giá";
+    if (!isPackage) {
+      newTrackBtn.addEventListener("click", () => {
+        toggleTrackGame(state.currentData.appId, state.currentData.name, state.currentData.image);
+      });
+    }
+  }
+  const historyButton = document.getElementById("viewHistoryBtn");
+  if (historyButton) {
+    historyButton.disabled = state.currentData.productType === "sub";
+    historyButton.title = historyButton.disabled ? "Lịch sử giá bundle chưa được ITAD hỗ trợ" : "Xem lịch sử giá";
   }
   
   if (avail.length > 0) {
@@ -1747,7 +1932,7 @@ function renderTable(prices) {
       <td class="t-converted">${formatCurrency(p.convertedValue, state.currency)}</td>
       <td class="t-diff ${p.diffValue > 0 ? 'diff-plus' : ''}">${p.diffValue > 0 ? '+' + formatCurrency(p.diffValue, state.currency) : "—"}</td>
       <td><span class="status-label success-text">${state.lang === "vi" ? "Khả dụng" : "Available"}</span></td>
-      <td><a href="https://store.steampowered.com/app/${state.currentData.appId}?cc=${p.code}" target="_blank" class="icon-btn" title="${t("open_steam")} (${p.name})"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></td>
+      <td><a href="https://store.steampowered.com/${state.currentData.productType === "sub" ? "sub" : "app"}/${state.currentData.appId}?cc=${p.code}" target="_blank" class="icon-btn" title="${t("open_steam")} (${p.name})"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></td>
     </tr>`;
   }).join("");
 }
@@ -1772,7 +1957,7 @@ function renderCardView(prices) {
         </div>
         <div class="m-meta">
           <span>${t("t_diff")}: ${p.diffValue > 0 ? '+' + formatCurrency(p.diffValue, state.currency) : '0'}</span>
-          <a href="https://store.steampowered.com/app/${state.currentData.appId}?cc=${p.code}" target="_blank" class="text-link small">${t("open_steam")}</a>
+          <a href="https://store.steampowered.com/${state.currentData.productType === "sub" ? "sub" : "app"}/${state.currentData.appId}?cc=${p.code}" target="_blank" class="text-link small">${t("open_steam")}</a>
         </div>
       </div>
     `;
@@ -1810,6 +1995,7 @@ async function renderRealHistoryChart(months = 12) {
   const note = document.querySelector(".history-note");
   const noteReal = document.querySelector(".history-note-real");
   const noteSimulated = document.querySelector(".history-note-simulated");
+  const lowSummary = document.getElementById("historyLowSummary");
   
   canvas.style.display = "none";
   loadingIndicator.innerHTML = `
@@ -1824,6 +2010,7 @@ async function renderRealHistoryChart(months = 12) {
   if (note) note.style.display = "none";
   if (noteReal) noteReal.classList.remove("hidden");
   if (noteSimulated) noteSimulated.classList.add("hidden");
+  lowSummary?.classList.add("hidden");
   
   if (priceHistoryChartInstance) {
     priceHistoryChartInstance.destroy();
@@ -1905,6 +2092,15 @@ async function renderRealHistoryChart(months = 12) {
       pointsHighest.push(highestBase * (1 - lastCut/100));
       if(userRegion) pointsUser.push(userBase * (1 - lastCut/100));
     }
+
+    const historicalLow = pointsLowest.length ? Math.min(...pointsLowest.filter(Number.isFinite)) : null;
+    const historicalLowIndex = Number.isFinite(historicalLow) ? pointsLowest.indexOf(historicalLow) : -1;
+    if (lowSummary && historicalLowIndex >= 0) {
+      const current = lowest?.convertedValue || 0;
+      const atLow = current > 0 && current <= historicalLow * 1.01;
+      lowSummary.innerHTML = `<span class="history-low-badge">HISTORICAL LOW</span><span>Thấp nhất trong ${months} tháng · ${labels[historicalLowIndex]}</span><strong>${formatCurrency(historicalLow, state.currency)}${atLow ? " · Nên cân nhắc mua" : ""}</strong>`;
+      lowSummary.classList.remove("hidden");
+    }
     
     loadingIndicator.classList.add("hidden");
     canvas.style.display = "block";
@@ -1951,6 +2147,18 @@ async function renderRealHistoryChart(months = 12) {
         backgroundColor: createGradient('139, 92, 246'),
         borderWidth: 2, pointBackgroundColor: '#8b5cf6', pointBorderColor: isDark ? '#1a202c' : '#fff', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6, fill: true, stepped: true
       });
+      if (historicalLowIndex >= 0) {
+        datasets.push({
+          label: state.lang === "vi" ? "Thấp nhất lịch sử" : "Historical Low",
+          data: pointsLowest.map((value, index) => index === historicalLowIndex ? value : null),
+          borderColor: '#5fd47a',
+          backgroundColor: '#5fd47a',
+          showLine: false,
+          pointStyle: 'star',
+          pointRadius: 8,
+          pointHoverRadius: 10
+        });
+      }
     }
     
     priceHistoryChartInstance = new Chart(ctx, {
@@ -1990,6 +2198,7 @@ async function renderRealHistoryChart(months = 12) {
   } catch (err) {
     console.error(err);
     loadingIndicator.innerHTML = `<div style="color:var(--danger)">${state.lang === 'vi' ? 'Không có dữ liệu cho tựa game này.' : 'No data available for this game.'}</div>`;
+    lowSummary?.classList.add("hidden");
   }
 }
 
@@ -1998,6 +2207,7 @@ async function renderSimulatedHistoryChart(months = 12) {
   const loadingIndicator = document.getElementById("chartLoadingIndicator");
   const noteReal = document.querySelector(".history-note-real");
   const noteSimulated = document.querySelector(".history-note-simulated");
+  document.getElementById("historyLowSummary")?.classList.add("hidden");
 
   if (priceHistoryChartInstance) {
     priceHistoryChartInstance.destroy();

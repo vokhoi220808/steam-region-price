@@ -98,6 +98,7 @@ export class TrackerPage {
       downloadJson(TrackerRepository.exportData());
     });
     document.getElementById('tpDataBtn')?.addEventListener('click', () => this.dataManager.open());
+    document.getElementById('tpWishlistSyncBtn')?.addEventListener('click', () => this.syncSteamWishlist());
     document.getElementById('tpTrackerFileInput')?.addEventListener('change', (event) => {
       const file = event.target.files?.[0];
       if (file) this.dataManager.previewFile(file);
@@ -376,6 +377,50 @@ export class TrackerPage {
     const search = document.getElementById('searchInput');
     if (search) search.value = String(game.appId);
     document.getElementById('searchForm')?.requestSubmit();
+  }
+
+  async syncSteamWishlist() {
+    const input = document.getElementById('tpSteamProfileInput');
+    const button = document.getElementById('tpWishlistSyncBtn');
+    const status = document.getElementById('tpWishlistSyncStatus');
+    const profile = input?.value.trim();
+    if (!profile) {
+      if (status) status.textContent = 'Hãy nhập Steam ID hoặc đường dẫn hồ sơ công khai.';
+      return;
+    }
+
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Đang đọc Wishlist công khai từ Steam…';
+    try {
+      const response = await fetch(`/api/wishlist?profile=${encodeURIComponent(profile)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Không thể đồng bộ Wishlist');
+      const existing = new Set(trackerStore.getAllGames().map((game) => Number(game.appId)));
+      let imported = 0;
+      for (const game of data.games || []) {
+        if (existing.has(Number(game.appId))) continue;
+        trackerStore.addGame({
+          appId: game.appId,
+          name: game.name,
+          headerImage: game.headerImage,
+          steamUrl: game.steamUrl,
+          tags: game.tags || [],
+          edition: 'Wishlist',
+          preferredRegion: 'vn',
+          comparisonRegions: ['vn', 'cn', 'us', 'tr']
+        });
+        existing.add(Number(game.appId));
+        imported += 1;
+      }
+      if (status) {
+        const limitNote = data.limited ? ' (đã giới hạn 200 mục để bảo vệ Steam API)' : '';
+        status.textContent = `Đã thêm ${imported}/${data.total} game; các game trùng được bỏ qua${limitNote}.`;
+      }
+    } catch (error) {
+      if (status) status.textContent = error.message;
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 
   async refreshPrices(ids = null) {

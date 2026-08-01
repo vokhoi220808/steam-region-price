@@ -39,17 +39,18 @@ A web tool for comparing Steam game prices across **27 regions**, converting the
 
 ### 🔍 Regional Price Comparison
 
-- Search for games by **name, App ID, or Steam URL**, with autocomplete support
+- Search for games, DLC, and Complete Bundles by **name, App/Package ID, or Steam URL**, with autocomplete support
 - Compare prices across **27 regions**: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, and AE
 - Automatically convert prices using **real-time exchange rates**, cached for six hours
 - Three display modes: **Table**, **Grid**, and **Bar Chart**
 - Sort results, filter regions, show or hide unavailable prices, and display discounted games only
-- **Export to CSV**, view price history through the IsThereAnyDeal API, and copy a shareable link
+- **Export to CSV**, view 3/6/12-month history charts and historical-low markers through the IsThereAnyDeal API, and copy a shareable link
 
 ### 🏷️ Top Deals
 
 - Featured games from Steam APIs, including Specials, Deep Discounts, Free Games, Top Sellers, and New Releases
-- Grid and list views, search, discount filters, and sorting
+- Official Valve Steam Sale/Festival calendar with live countdowns
+- Grid and list views with discount, review, genre, CCU, and content-type filters
 - Open any deal directly in the regional price comparison page
 
 ### 📊 Price Tracker
@@ -65,6 +66,7 @@ A web tool for comparing Steam game prices across **27 regions**, converting the
 - A complete **toolbar** with search, status/region/tag/price filters, ten sorting modes, grid/list switching, and density controls
 - A **detail drawer** with Overview, Regional Prices, Local History, and Storage Information tabs
 - **Bulk price updates** using three parallel workers
+- Public Wishlist sync via Steam ID or profile link (requires `STEAM_API_KEY`)
 
 ### 💾 Data Management
 
@@ -133,14 +135,16 @@ Create a `.env` file in the project root. Do not commit this file to Git.
 ```env
 PORT=3000
 ITAD_API_KEY=your_api_key_here
+STEAM_API_KEY=your_steam_web_api_key_here
 ```
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
 | `PORT` | `3000` | No | Server port |
 | `ITAD_API_KEY` | — | No | API key from [IsThereAnyDeal](https://isthereanydeal.com/dev/key/), required for price history |
+| `STEAM_API_KEY` | — | No | Steam Web API key, required to sync a public Wishlist from a Steam ID/Profile Link |
 
-> **Note:** The application still works without `ITAD_API_KEY`. Only the price-history feature is affected; the History tab in the detail drawer will display simulated development data instead of live API data.
+> **Note:** The application still works without either API key. `ITAD_API_KEY` enables real price history; `STEAM_API_KEY` enables Wishlist sync.
 
 ### Testing
 
@@ -225,6 +229,10 @@ The project contains approximately **7,800 lines of source code**, excluding `no
 | `GET /api/compare/:appId?currency=VND&regions=vn,us,...` | Fetch regional prices, convert currencies, and rank the results |
 | `GET /api/history/:appId` | Fetch price history from the IsThereAnyDeal API |
 | `GET /api/deals?cc=VN` | Fetch featured games from the Steam Featured Categories API |
+| `GET /api/deals/metadata?appids=...` | Fetch reviews, genres, and CCU for advanced filters |
+| `GET /api/sales-calendar` | Return upcoming Steam Sale/Festival events |
+| `GET /api/wishlist?profile=...` | Sync a public Steam Wishlist |
+| `GET /api/cache/status` | Return cache hit/miss and capacity statistics |
 
 ### API Keys
 
@@ -233,6 +241,7 @@ The project contains approximately **7,800 lines of source code**, excluding `no
 | **Steam Store API** | No key required | Free to access, with rate limits |
 | **Open Exchange Rates** | No key required | Free tier, cached for six hours |
 | **IsThereAnyDeal** | API key required | Free registration at [isthereanydeal.com/dev/key](https://isthereanydeal.com/dev/key/) |
+| **Steam Web API** | API key required for Wishlist | Register at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) |
 
 > **Why is a CORS proxy required?** Steam's API does not support browser CORS requests, so all frontend requests are sent through the backend server.
 
@@ -242,6 +251,8 @@ The project contains approximately **7,800 lines of source code**, excluding `no
 |---|---|---|
 | Game prices | 20 minutes | In-memory `Map` |
 | Exchange rates | 6 hours | In-memory `Map` |
+| Deals / CCU | 5 minutes | In-memory `Map` |
+| Metadata | 6 hours | In-memory `Map` |
 
 The server acts as a **CORS proxy**, routing requests to Steam APIs to avoid browser restrictions.
 

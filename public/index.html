@@ -460,6 +460,18 @@
         </div>
       </div>
 
+      <section class="sale-calendar" id="saleCalendar" aria-labelledby="saleCalendarTitle">
+        <div class="sale-calendar-head">
+          <div>
+            <span class="sale-calendar-kicker">LỊCH SỰ KIỆN CHÍNH THỨC</span>
+            <h3 id="saleCalendarTitle">Steam Sales Calendar</h3>
+          </div>
+          <a href="https://partner.steamgames.com/doc/marketing/upcoming_events" target="_blank" rel="noopener">Nguồn Valve ↗</a>
+        </div>
+        <div class="sale-calendar-skeleton" id="saleCalendarLoading"><span></span><span></span><span></span></div>
+        <div class="sale-calendar-grid hidden" id="saleCalendarGrid"></div>
+      </section>
+
       <!-- TABS -->
       <div class="deals-tabs-container" style="display: flex; justify-content: center; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
         <div class="deals-tabs" style="display: flex; gap: 8px; background: var(--surface-elevated); padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
@@ -485,6 +497,30 @@
             <option value="50">Từ 50%</option>
             <option value="75">Từ 75%</option>
             <option value="90">Từ 90%</option>
+          </select>
+          <select id="dealReviewFilter" class="deal-filter-select">
+            <option value="0">Mọi đánh giá</option>
+            <option value="8">Very Positive+</option>
+            <option value="9">Overwhelmingly Positive</option>
+          </select>
+          <select id="dealGenreFilter" class="deal-filter-select">
+            <option value="all">Mọi thể loại</option>
+            <option value="Action">Action</option>
+            <option value="RPG">RPG</option>
+            <option value="Indie">Indie</option>
+            <option value="Strategy">Strategy</option>
+            <option value="Adventure">Adventure</option>
+          </select>
+          <select id="dealCcuFilter" class="deal-filter-select">
+            <option value="0">Mọi CCU</option>
+            <option value="100">100+ người chơi</option>
+            <option value="1000">1.000+ người chơi</option>
+            <option value="10000">10.000+ người chơi</option>
+          </select>
+          <select id="dealContentFilter" class="deal-filter-select">
+            <option value="all">Game & DLC</option>
+            <option value="game">Game gốc</option>
+            <option value="dlc">DLC / Nội dung</option>
           </select>
         </div>
         
@@ -556,6 +592,11 @@
             <button type="button" class="tp-button-secondary" id="tpExportBtn">Xuất dữ liệu</button>
             <button type="button" class="tp-button-quiet" id="tpDataBtn">Dữ liệu cục bộ</button>
             <input type="file" id="tpTrackerFileInput" accept=".json,application/json" hidden>
+          </div>
+          <div class="tp-wishlist-sync">
+            <input id="tpSteamProfileInput" type="text" placeholder="Steam ID hoặc Profile Link công khai" autocomplete="off">
+            <button type="button" class="tp-button-secondary" id="tpWishlistSyncBtn">Đồng bộ Wishlist</button>
+            <span id="tpWishlistSyncStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
         <div class="tp-header-overview" id="tpOverview" aria-label="Tổng quan danh sách"></div>
@@ -639,6 +680,7 @@
           <button class="btn btn-outline btn-small filter-btn" data-range="3" data-i18n="history_range_3m">3 Tháng</button>
         </div>
       </div>
+      <div class="history-low-summary hidden" id="historyLowSummary" role="status"></div>
       <div id="chartLoadingIndicator" class="hidden" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
         <div class="spin-icon" style="display: inline-block; animation: spin 1s linear infinite; margin-bottom: 8px;">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
