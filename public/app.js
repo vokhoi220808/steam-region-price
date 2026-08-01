@@ -52,6 +52,7 @@ const I18N = {
     mins_ago: "phút trước",
     hours_ago: "giờ trước",
     dev: "Nhà phát triển:",
+    publisher: "Nhà xuất bản:",
     release: "Phát hành:",
     search_empty: "Không tìm thấy kết quả",
     open_steam: "Mở trên Steam",
@@ -73,6 +74,7 @@ const I18N = {
     qa_all: "Chọn tất cả",
     qa_none: "Bỏ chọn",
     fx_note: "Tất cả mức giá sẽ được quy đổi sang {curr} theo tỷ giá mới nhất.",
+    fx_payment_note: "Tỷ giá thanh toán thực tế có thể chênh lệch do ngân hàng hoặc phí chuyển đổi ngoại tệ của Steam.",
     summary_regions: "{count} khu vực được chọn",
     summary_converted: "Quy đổi sang {curr}",
     summary_updated: "Tỷ giá cập nhật {time}",
@@ -137,6 +139,7 @@ const I18N = {
     mins_ago: "mins ago",
     hours_ago: "hours ago",
     dev: "Developer:",
+    publisher: "Publisher:",
     release: "Release:",
     search_empty: "No results found",
     open_steam: "Open in Steam",
@@ -158,6 +161,7 @@ const I18N = {
     qa_all: "Select All",
     qa_none: "Deselect All",
     fx_note: "All prices are converted to {curr} using the latest FX rates.",
+    fx_payment_note: "Your actual payment rate may differ due to bank charges or Steam currency-conversion fees.",
     summary_regions: "{count} regions selected",
     summary_converted: "Converted to {curr}",
     summary_updated: "Rates updated {time}",
@@ -244,6 +248,7 @@ function toggleLang() {
       }
     });
     renderData();
+    fetchRealData(String(state.currentData.appId));
   }
 }
 
@@ -351,6 +356,46 @@ function setInlineFieldError(input, message) {
     input.removeAttribute("aria-invalid");
     error?.remove();
   }, { once: true });
+}
+
+function clearInlineFieldError(input) {
+  if (!input) return;
+  input.removeAttribute("aria-invalid");
+  input.closest("form, .search-container, .setup-card")
+    ?.querySelector(".inline-field-error")
+    ?.remove();
+}
+
+function showFeedback(message, type = "success") {
+  const region = document.getElementById("feedbackRegion");
+  if (!region) return;
+  const feedback = document.createElement("div");
+  feedback.className = `copy-feedback ${type}`;
+  feedback.setAttribute("role", type === "error" ? "alert" : "status");
+  feedback.textContent = message;
+  region.appendChild(feedback);
+  requestAnimationFrame(() => feedback.classList.add("show"));
+  setTimeout(() => {
+    feedback.classList.remove("show");
+    setTimeout(() => feedback.remove(), 220);
+  }, 2400);
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("Clipboard unavailable");
 }
 
 function exportCurrentComparisonCsv() {
@@ -1210,12 +1255,13 @@ function setupEvents() {
           autocompleteDropdown.querySelectorAll(".autocomplete-item").forEach(el => {
             el.addEventListener("click", () => {
               searchInput.value = el.dataset.id;
+              clearInlineFieldError(searchInput);
               autocompleteDropdown.classList.add("hidden");
               fetchRealData(el.dataset.id);
             });
           });
         } else {
-          autocompleteDropdown.innerHTML = `<div class="ac-empty" data-i18n="search_not_found">${t("search_empty")}</div>`;
+          autocompleteDropdown.innerHTML = `<div class="ac-empty"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.5" y2="16.5"></line></svg><span>${t("search_empty")}</span></div>`;
           autocompleteDropdown.classList.remove("hidden");
         }
       } catch (err) {
@@ -1257,7 +1303,7 @@ function setupEvents() {
     }
   });
   document.getElementById("triggerCompareBtn").addEventListener("click", () => {
-    const val = document.getElementById("searchInput").value || "1245620";
+    const val = document.getElementById("searchInput").value;
     fetchRealData(val);
   });
   
@@ -1300,14 +1346,11 @@ function setupEvents() {
   document.getElementById("exportCsvBtn").addEventListener("click", exportCurrentComparisonCsv);
   
   document.getElementById("copyResultLinkBtn").addEventListener("click", () => {
-    const copyButton = document.getElementById("copyResultLinkBtn");
-    navigator.clipboard.writeText(window.location.href)
+    copyText(window.location.href)
       .then(() => {
-        const previousText = copyButton.textContent;
-        copyButton.textContent = state.lang === "vi" ? "Đã sao chép" : "Copied";
-        setTimeout(() => { copyButton.textContent = previousText; }, 1400);
+        showFeedback(t("copied"));
       })
-      .catch(() => console.error("Clipboard failed"));
+      .catch(() => showFeedback(state.lang === "vi" ? "Không thể sao chép liên kết." : "Could not copy the link.", "error"));
   });
   
   document.getElementById("refreshFxBtn").addEventListener("click", () => {
@@ -1439,13 +1482,16 @@ function updateDealsCountdowns() {
 }
 
 async function fetchRealData(query) {
-  let appId = query.trim();
+  const searchInput = document.getElementById("searchInput");
+  let appId = String(query || "").trim();
   const steamUrlMatch = appId.match(/app\/(\d+)/);
   if (steamUrlMatch) appId = steamUrlMatch[1];
   else if (!/^\d+$/.test(appId)) {
-    setInlineFieldError(document.getElementById("searchInput"), "Vui lòng nhập App ID hợp lệ");
+    setInlineFieldError(searchInput, state.lang === "vi" ? "Vui lòng nhập App ID hợp lệ" : "Please enter a valid App ID");
     return;
   }
+  clearInlineFieldError(searchInput);
+  searchInput.value = appId;
   
   if (selectedRegions.size === 0) {
     setInlineFieldError(document.getElementById("regionSearchInput"), "Vui lòng chọn ít nhất một khu vực");
@@ -1456,10 +1502,19 @@ async function fetchRealData(query) {
   document.getElementById("emptyState").classList.add("hidden");
   document.getElementById("errorState").classList.add("hidden");
   document.getElementById("resultsArea").classList.add("hidden");
-  document.getElementById("loadingState").classList.remove("hidden");
+  const loadingState = document.getElementById("loadingState");
+  const loadingProgressText = document.getElementById("loadingProgressText");
+  const loadingProgressBar = document.getElementById("loadingProgressBar");
+  const compareButtons = [document.querySelector("#searchForm .search-submit"), document.getElementById("triggerCompareBtn")].filter(Boolean);
+  loadingProgressText.textContent = t("loading_progress").replace("{count}", "0").replace("{total}", selectedRegions.size);
+  loadingProgressBar.style.width = "12%";
+  loadingState.classList.remove("hidden");
+  loadingState.setAttribute("aria-busy", "true");
+  compareButtons.forEach(button => { button.disabled = true; });
+  loadingState.scrollIntoView({ behavior: "smooth", block: "center" });
   
   try {
-    const res = await fetch(`/api/compare/${appId}?currency=${state.currency}&regions=${regionCodes}`);
+    const res = await fetch(`/api/compare/${appId}?currency=${state.currency}&regions=${regionCodes}&lang=${state.lang}`);
     if (!res.ok) throw new Error("Lỗi tải dữ liệu");
     const data = await res.json();
     
@@ -1482,10 +1537,11 @@ async function fetchRealData(query) {
       appId: data.appId,
       name: data.gameName || "Trò chơi chưa xác định",
       image: data.image || "",
-      dev: data.publisher || "Không rõ",
-      release: data.releaseDate || "Không rõ",
+      developer: data.developer || data.publisher || t("unknown"),
+      publisher: data.publisher || data.developer || t("unknown"),
+      release: data.releaseDate || t("unknown"),
       tags: data.genres ? data.genres.split(", ").slice(0, 4) : ["Game"],
-      description: data.shortDescription || "Không có thông tin giới thiệu.",
+      description: data.shortDescription || (state.lang === "vi" ? "Không có thông tin giới thiệu." : "No description available."),
       prices: prices
     };
     
@@ -1494,7 +1550,9 @@ async function fetchRealData(query) {
     
     processData();
     renderData();
-    document.getElementById("loadingState").classList.add("hidden");
+    loadingProgressText.textContent = t("loading_progress").replace("{count}", selectedRegions.size).replace("{total}", selectedRegions.size);
+    loadingProgressBar.style.width = "100%";
+    loadingState.classList.add("hidden");
     document.getElementById("resultsArea").classList.remove("hidden");
     
     // Update URL for sharing
@@ -1503,10 +1561,13 @@ async function fetchRealData(query) {
     window.history.pushState({}, '', url);
     
   } catch (error) {
-    document.getElementById("loadingState").classList.add("hidden");
+    loadingState.classList.add("hidden");
     document.getElementById("resultsArea").classList.add("hidden");
     document.getElementById("errorState").classList.remove("hidden");
     console.error(error);
+  } finally {
+    loadingState.removeAttribute("aria-busy");
+    compareButtons.forEach(button => { button.disabled = false; });
   }
 }
 
@@ -1593,10 +1654,11 @@ function renderData() {
   
   document.getElementById("gameTitleName").textContent = state.currentData.name;
   document.getElementById("gameCoverImg").src = state.currentData.image;
-  document.getElementById("gameDeveloper").textContent = state.currentData.dev;
+  document.getElementById("gameDeveloper").textContent = state.currentData.developer;
+  document.getElementById("gamePublisher").textContent = state.currentData.publisher;
   document.getElementById("gameRelease").textContent = state.currentData.release;
   document.getElementById("gameId").textContent = state.currentData.appId;
-  document.getElementById("gameDescription").innerHTML = state.currentData.description;
+  document.getElementById("gameDescription").textContent = state.currentData.description;
   document.getElementById("gameTags").innerHTML = state.currentData.tags.map(t => `<span class="tag">${t}</span>`).join("");
   document.getElementById("gameSteamLinkBtn").href = `https://store.steampowered.com/app/${state.currentData.appId}`;
   

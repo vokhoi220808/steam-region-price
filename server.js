@@ -102,16 +102,17 @@ async function getExchangeRates(targetCurrency = "VND") {
   }
 }
 
-async function getRegionalPrice(appId, region) {
-  const cacheKey = `price:${appId}:${region.code}`;
+async function getRegionalPrice(appId, region, language = "vietnamese") {
+  const steamLanguage = language === "english" ? "english" : "vietnamese";
+  const cacheKey = `price:${appId}:${region.code}:${steamLanguage}`;
   const cached = getCache(cacheKey);
   if (cached) return cached;
 
   const params = new URLSearchParams({
     appids: String(appId),
     cc: region.code,
-    l: "vietnamese",
-    filters: "basic,price_overview"
+    l: steamLanguage,
+    filters: "basic,developers,publishers,release_date,genres,price_overview"
   });
 
   try {
@@ -134,6 +135,7 @@ async function getRegionalPrice(appId, region) {
         isFree: true,
         gameName: game.name,
         image: game.header_image,
+        developer: game.developers?.[0] || null,
         publisher: game.publishers?.[0] || null,
         releaseDate: game.release_date?.date || null,
         genres: game.genres?.map(g => g.description).join(", ") || null,
@@ -155,7 +157,12 @@ async function getRegionalPrice(appId, region) {
         ...region,
         available: false,
         gameName: game.name,
-        image: game.header_image
+        image: game.header_image,
+        developer: game.developers?.[0] || null,
+        publisher: game.publishers?.[0] || null,
+        releaseDate: game.release_date?.date || null,
+        genres: game.genres?.map(g => g.description).join(", ") || null,
+        shortDescription: game.short_description || null
       };
       setCache(cacheKey, unavailable, PRICE_TTL);
       return unavailable;
@@ -167,6 +174,7 @@ async function getRegionalPrice(appId, region) {
       isFree: false,
       gameName: game.name,
       image: game.header_image,
+      developer: game.developers?.[0] || null,
       publisher: game.publishers?.[0] || null,
       releaseDate: game.release_date?.date || null,
       genres: game.genres?.map(g => g.description).join(", ") || null,
@@ -210,6 +218,9 @@ app.get("/api/compare/:appId", async (req, res) => {
   }
 
   const targetCurrency = String(req.query.currency || "VND").toUpperCase();
+  const language = String(req.query.lang || "vi").toLowerCase() === "en"
+    ? "english"
+    : "vietnamese";
 
   const requestedCodes = String(req.query.regions || "")
     .split(",")
@@ -225,7 +236,7 @@ app.get("/api/compare/:appId", async (req, res) => {
   }
 
   const [prices, rates] = await Promise.all([
-    Promise.all(selectedRegions.map((region) => getRegionalPrice(appId, region))),
+    Promise.all(selectedRegions.map((region) => getRegionalPrice(appId, region, language))),
     getExchangeRates(targetCurrency)
   ]);
 
@@ -255,15 +266,16 @@ app.get("/api/compare/:appId", async (req, res) => {
         : null
   }));
 
-  const sample = enriched.find((item) => item.gameName);
+  const firstValue = (field) => enriched.find((item) => item[field])?.[field] || null;
   res.json({
     appId: Number(appId),
-    gameName: sample?.gameName || null,
-    image: sample?.image || null,
-    publisher: sample?.publisher || null,
-    releaseDate: sample?.releaseDate || null,
-    genres: sample?.genres || null,
-    shortDescription: sample?.shortDescription || null,
+    gameName: firstValue("gameName"),
+    image: firstValue("image"),
+    developer: firstValue("developer"),
+    publisher: firstValue("publisher"),
+    releaseDate: firstValue("releaseDate"),
+    genres: firstValue("genres"),
+    shortDescription: firstValue("shortDescription"),
     fxAvailable: Boolean(rates),
     checkedAt: new Date().toISOString(),
     prices: enriched
@@ -328,6 +340,8 @@ app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Steam Price Comparator: http://localhost:${PORT}`);
 });
+
+export { app, server };

@@ -165,6 +165,7 @@
               </div>
               
               <p class="currency-hint" id="currencyHintText">Tất cả mức giá sẽ được quy đổi sang <strong id="hintCurrencyCode">VND</strong> theo tỷ giá mới nhất.</p>
+              <p class="fx-payment-note" data-i18n="fx_payment_note">Tỷ giá thanh toán thực tế có thể chênh lệch do ngân hàng hoặc phí chuyển đổi ngoại tệ của Steam.</p>
               
               <div class="fx-status">
                 <div class="fx-info">
@@ -271,6 +272,7 @@
               <h2 id="gameTitleName">Tên Game</h2>
               <div class="game-meta">
                 <span class="meta-row"><span data-i18n="dev">Nhà phát triển:</span> <strong id="gameDeveloper">...</strong></span>
+                <span class="meta-row"><span data-i18n="publisher">Nhà xuất bản:</span> <strong id="gamePublisher">...</strong></span>
                 <span class="meta-row"><span data-i18n="release">Phát hành:</span> <strong id="gameRelease">...</strong></span>
                 <span class="meta-row">App ID: <strong id="gameId">...</strong></span>
               </div>
@@ -595,7 +597,9 @@
         <button type="button" class="tp-dialog-btn-danger" id="tpDialogConfirmBtn">Xác nhận</button>
       </div>
     </div>
-  </main>
+    </main>
+
+    <div id="feedbackRegion" class="feedback-region" aria-live="polite" aria-atomic="true"></div>
 
   <!-- Mobile Bottom Sheet Overlays -->
   <div class="overlay hidden" id="mobileOverlay"></div>
