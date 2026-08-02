@@ -136,6 +136,13 @@ Create a `.env` file in the project root. Do not commit this file to Git.
 PORT=3000
 ITAD_API_KEY=your_api_key_here
 STEAM_API_KEY=your_steam_web_api_key_here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+CRON_SECRET=your_long_random_secret
+ALERT_BATCH_SIZE=80
+TELEGRAM_BOT_TOKEN=your_bot_token
+RESEND_API_KEY=re_xxxxxxxxx
+ALERT_FROM_EMAIL=Steam Price Compare <alerts@your-domain.com>
 ```
 
 | Variable | Default | Required | Description |
@@ -143,8 +150,25 @@ STEAM_API_KEY=your_steam_web_api_key_here
 | `PORT` | `3000` | No | Server port |
 | `ITAD_API_KEY` | — | No | API key from [IsThereAnyDeal](https://isthereanydeal.com/dev/key/), required for price history |
 | `STEAM_API_KEY` | — | No | Steam Web API key, required to sync a public Wishlist from a Steam ID/Profile Link |
+| `SUPABASE_URL` | — | Cloud Alerts | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | Cloud Alerts | Service role key; keep it in backend/Vercel environment variables only |
+| `CRON_SECRET` | — | Cloud Alerts | Secret protecting the cron endpoint |
+| `ALERT_BATCH_SIZE` | `80` | No | Maximum alerts processed per run, hard-capped at 500 |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram | Shared Telegram bot token |
+| `RESEND_API_KEY` | — | Email | Resend API key |
+| `ALERT_FROM_EMAIL` | — | Email | Sender on a verified domain |
 
 > **Note:** The application still works without either API key. `ITAD_API_KEY` enables real price history; `STEAM_API_KEY` enables Wishlist sync.
+
+### Cloud Price Alerts on Vercel
+
+1. Create a Supabase project and run `supabase/migrations/001_cloud_price_alerts.sql` in its SQL Editor.
+2. Add the environment variables above to Vercel. Never expose the service role key to frontend code.
+3. Deploy. `vercel.json` invokes `/api/cron/check-alerts` daily at 02:00 UTC, which is suitable for Vercel Hobby.
+4. For six-hour checks, use Supabase Cron to call the same endpoint with `Authorization: Bearer <CRON_SECRET>`, or adjust the schedule on an appropriate Vercel plan.
+5. Open **Price Tracker → Price Alerts**, configure at least one channel, then select **Save & sync**.
+
+Discord only needs a Webhook URL. Telegram requires `TELEGRAM_BOT_TOKEN` plus the recipient Chat ID. Email requires Resend and a verified sender domain. Each cron invocation handles 80 alerts by default with four concurrent price requests and repeats an alert only after a 24-hour cooldown when the price drops further.
 
 ### Testing
 
@@ -233,6 +257,11 @@ The project contains approximately **7,800 lines of source code**, excluding `no
 | `GET /api/sales-calendar` | Return upcoming Steam Sale/Festival events |
 | `GET /api/wishlist?profile=...` | Sync a public Steam Wishlist |
 | `GET /api/cache/status` | Return cache hit/miss and capacity statistics |
+| `GET /api/alerts/status` | Return Cloud Alerts readiness and available channels |
+| `POST /api/alerts/sync` | Sync games with target prices to Supabase |
+| `POST /api/alerts/test` | Send a test through the saved channels |
+| `DELETE /api/alerts` | Disable all alerts for the current device |
+| `GET /api/cron/check-alerts` | `CRON_SECRET`-protected price check and notification job |
 
 ### API Keys
 

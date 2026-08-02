@@ -8,7 +8,9 @@ test('tracker runtime element ids exist in the document', () => {
     'trackerView', 'tpOverview', 'tpSummary', 'tpToolbar', 'tpCollections',
     'tpContent', 'tpSheet', 'tpSheetHeader', 'tpSheetBody', 'tpSheetFooter',
     'tpDrawer', 'tpDrawerHeader', 'tpDrawerTabs', 'tpDrawerContent',
-    'tpDataModal', 'tpDialog', 'tpDialogConfirmBtn', 'tpDialogCancelBtn'
+    'tpDataModal', 'tpAlertBtn', 'tpAlertModal', 'tpAlertForm', 'tpAlertStatus',
+    'tpAlertSaveBtn', 'tpAlertTestBtn', 'tpAlertDisableBtn',
+    'tpDialog', 'tpDialogConfirmBtn', 'tpDialogCancelBtn'
   ];
 
   requiredIds.forEach((id) => assert.match(html, new RegExp(`id=["']${id}["']`)));

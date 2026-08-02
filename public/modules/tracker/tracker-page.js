@@ -10,6 +10,7 @@ import GameRow from '../components/game-row.js';
 import GameSheet from '../components/game-sheet.js';
 import GameDrawer from '../components/game-drawer.js';
 import DataManager from '../components/data-manager.js';
+import AlertSettings from '../components/alert-settings.js';
 import { showConfirmDialog } from '../components/confirm-dialog.js';
 import { renderEmptyState } from '../components/empty-state.js';
 import { downloadJson } from '../storage/storage-import-export.js';
@@ -66,6 +67,7 @@ export class TrackerPage {
     this.dataManager = new DataManager({
       onDataChanged: () => trackerStore.reload()
     });
+    this.alertSettings = new AlertSettings();
 
     this._onStoreChange = this._onStoreChange.bind(this);
     this._onOnlineState = this._onOnlineState.bind(this);
@@ -138,6 +140,8 @@ export class TrackerPage {
 
   _onStoreChange(state, change) {
     this.render(state, change);
+    this.alertSettings.updateButton();
+    this.alertSettings.queueSync(change);
     if (this.drawer.gameId && change.id === this.drawer.gameId) this.drawer.render();
   }
 

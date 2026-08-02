@@ -590,6 +590,7 @@
             <button type="button" class="tp-button-primary" id="tpAddBtn">+ Thêm game</button>
             <button type="button" class="tp-button-secondary" id="tpImportBtn">Nhập danh sách</button>
             <button type="button" class="tp-button-secondary" id="tpExportBtn">Xuất dữ liệu</button>
+            <button type="button" class="tp-button-secondary" id="tpAlertBtn">🔔 Thông báo giá</button>
             <button type="button" class="tp-button-quiet" id="tpDataBtn">Dữ liệu cục bộ</button>
             <input type="file" id="tpTrackerFileInput" accept=".json,application/json" hidden>
           </div>
@@ -627,6 +628,47 @@
     <!-- === LOCAL DATA MANAGEMENT === -->
     <div class="tp-layer-overlay" id="tpDataOverlay"></div>
     <section class="tp-data-modal" id="tpDataModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpDataTitle"></section>
+
+    <!-- === CLOUD ALERT SETTINGS === -->
+    <div class="tp-layer-overlay" id="tpAlertOverlay"></div>
+    <section class="tp-alert-modal" id="tpAlertModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tpAlertTitle">
+      <header class="tp-alert-header">
+        <div>
+          <p class="tp-eyebrow">CLOUD PRICE ALERTS</p>
+          <h2 id="tpAlertTitle">Nhận thông báo khi đạt giá mục tiêu</h2>
+          <p>Danh sách có giá mục tiêu sẽ được kiểm tra tự động trên máy chủ.</p>
+        </div>
+        <button type="button" class="tp-button-quiet" data-alert-close aria-label="Đóng">✕</button>
+      </header>
+      <div class="tp-alert-body">
+        <div class="tp-alert-summary" id="tpAlertSummary"></div>
+        <form id="tpAlertForm" novalidate>
+          <label class="tp-field">
+            <span>Email</span>
+            <input name="email" type="email" autocomplete="email" placeholder="ban@example.com">
+            <small class="tp-field-hint">Gửi qua Resend; tên miền gửi phải được xác minh trên máy chủ.</small>
+          </label>
+          <label class="tp-field">
+            <span>Discord Webhook URL</span>
+            <input name="discordWebhook" type="url" autocomplete="off" placeholder="https://discord.com/api/webhooks/…">
+            <small class="tp-field-hint">Tạo webhook trong Server Settings → Integrations → Webhooks.</small>
+          </label>
+          <label class="tp-field">
+            <span>Telegram Chat ID</span>
+            <input name="telegramChatId" type="text" inputmode="numeric" autocomplete="off" placeholder="123456789">
+            <small class="tp-field-hint">Nhắn tin cho bot trước, sau đó nhập Chat ID của bạn hoặc nhóm.</small>
+          </label>
+        </form>
+        <p class="tp-alert-privacy">Thông tin kênh chỉ được gửi đến backend của website và lưu trong Supabase. Khóa quản lý cảnh báo được lưu trên thiết bị này.</p>
+        <div class="tp-alert-status" id="tpAlertStatus" role="status" aria-live="polite"></div>
+      </div>
+      <footer class="tp-alert-footer">
+        <button type="button" class="tp-button-danger" id="tpAlertDisableBtn" hidden>Tắt cảnh báo</button>
+        <button type="button" class="tp-button-secondary" data-alert-close>Đóng</button>
+        <button type="button" class="tp-button-secondary" id="tpAlertTestBtn">Gửi thử</button>
+        <button type="submit" form="tpAlertForm" class="tp-button-primary" id="tpAlertSaveBtn">Lưu & đồng bộ</button>
+      </footer>
+    </section>
 
     <!-- === CONFIRM DIALOG === -->
     <div class="tp-dialog-overlay" id="tpDialogOverlay"></div>

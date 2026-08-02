@@ -131,6 +131,13 @@ Tạo file `.env` trong thư mục gốc (không commit lên git):
 PORT=3000
 ITAD_API_KEY=your_api_key_here
 STEAM_API_KEY=your_steam_web_api_key_here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+CRON_SECRET=your_long_random_secret
+ALERT_BATCH_SIZE=80
+TELEGRAM_BOT_TOKEN=your_bot_token
+RESEND_API_KEY=re_xxxxxxxxx
+ALERT_FROM_EMAIL=Steam Price Compare <alerts@your-domain.com>
 ```
 
 | Biến | Mặc định | Bắt buộc | Mô tả |
@@ -138,8 +145,25 @@ STEAM_API_KEY=your_steam_web_api_key_here
 | `PORT` | `3000` | Không | Port của server |
 | `ITAD_API_KEY` | — | Không | API key từ [IsThereAnyDeal](https://isthereanydeal.com/dev/key/) — cần cho tính năng lịch sử giá |
 | `STEAM_API_KEY` | — | Không | Steam Web API key — cần để đồng bộ Wishlist công khai bằng Steam ID/Profile Link |
+| `SUPABASE_URL` | — | Cloud Alerts | URL dự án Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | Cloud Alerts | Service role key, chỉ đặt ở backend/Vercel Environment Variables |
+| `CRON_SECRET` | — | Cloud Alerts | Khóa bảo vệ endpoint cron |
+| `ALERT_BATCH_SIZE` | `80` | Không | Số cảnh báo tối đa xử lý mỗi lượt, giới hạn cứng 500 |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram | Token của Telegram bot dùng chung cho website |
+| `RESEND_API_KEY` | — | Email | API key gửi mail qua Resend |
+| `ALERT_FROM_EMAIL` | — | Email | Địa chỉ gửi từ domain đã xác minh |
 
 > **Lưu ý:** Không có các API key thì ứng dụng vẫn chạy bình thường. `ITAD_API_KEY` mở dữ liệu lịch sử giá thật; `STEAM_API_KEY` mở tính năng đồng bộ Wishlist.
+
+### Cloud Price Alerts trên Vercel
+
+1. Tạo dự án Supabase và chạy file `supabase/migrations/001_cloud_price_alerts.sql` trong SQL Editor.
+2. Thêm các biến môi trường ở trên vào Vercel; tuyệt đối không đưa service role key vào frontend.
+3. Deploy dự án. `vercel.json` gọi `/api/cron/check-alerts` mỗi ngày lúc 02:00 UTC, phù hợp Vercel Hobby.
+4. Nếu cần kiểm tra mỗi 6 giờ, dùng Supabase Cron gọi cùng endpoint với header `Authorization: Bearer <CRON_SECRET>` hoặc đổi lịch trên gói Vercel phù hợp.
+5. Vào **Theo dõi giá → Thông báo giá**, nhập ít nhất một kênh và bấm **Lưu & đồng bộ**.
+
+Discord hoạt động chỉ với Webhook URL. Telegram cần `TELEGRAM_BOT_TOKEN` và Chat ID của người nhận. Email cần Resend cùng domain gửi đã xác minh. Cron mặc định xử lý 80 cảnh báo/lượt, bốn request giá đồng thời và chỉ báo lại khi giá giảm thêm sau cooldown 24 giờ.
 
 ### Kiểm thử
 
@@ -228,6 +252,11 @@ steam-region-price-comparator/
 | `GET /api/sales-calendar` | Lịch Steam Sale/Festival sắp tới |
 | `GET /api/wishlist?profile=...` | Đồng bộ Wishlist công khai từ Steam |
 | `GET /api/cache/status` | Thống kê hit/miss và dung lượng cache |
+| `GET /api/alerts/status` | Trạng thái Cloud Alerts và các kênh đã cấu hình |
+| `POST /api/alerts/sync` | Đồng bộ các game có giá mục tiêu lên Supabase |
+| `POST /api/alerts/test` | Gửi thông báo thử qua các kênh đã lưu |
+| `DELETE /api/alerts` | Tắt toàn bộ cảnh báo của thiết bị hiện tại |
+| `GET /api/cron/check-alerts` | Job được bảo vệ bằng `CRON_SECRET` để kiểm tra và gửi cảnh báo |
 
 ### API Keys
 

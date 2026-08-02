@@ -1,13 +1,22 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash, timingSafeEqual } from "node:crypto";
 import "dotenv/config";
+import {
+  disableCloudAlerts,
+  getCloudAlertCapabilities,
+  runCloudAlertChecks,
+  sendCloudAlertTest,
+  syncCloudAlerts
+} from "./server/cloud-alerts.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+app.use(express.json({ limit: "96kb" }));
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders: (res, path) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -295,6 +304,26 @@ async function getRegionalPackagePrice(packageId, region, language = "vietnamese
   } catch (error) {
     return { ...region, available: false, productType: "sub", error: error.message };
   }
+}
+
+async function getCloudAlertQuote(alert) {
+  const region = REGIONS.find((item) => item.code === String(alert.region_code || "").toLowerCase());
+  if (!region) return { available: false };
+  const productType = alert.product_type === "sub" ? "sub" : "app";
+  const price = productType === "sub"
+    ? await getRegionalPackagePrice(alert.app_id, region, "vietnamese")
+    : await getRegionalPrice(alert.app_id, region, "vietnamese");
+  if (!price?.available) return { available: false };
+  if (price.isFree) return { available: true, amount: 0, discountPercent: 100 };
+
+  const targetCurrency = String(alert.target_currency || "VND").toUpperCase();
+  if (price.currency === targetCurrency) {
+    return { available: true, amount: price.final, discountPercent: price.discountPercent || 0 };
+  }
+  const rates = await getExchangeRates(targetCurrency);
+  const rate = rates?.[price.currency];
+  if (!Number.isFinite(rate) || rate <= 0) return { available: false };
+  return { available: true, amount: price.final / rate, discountPercent: price.discountPercent || 0 };
 }
 
 async function getPackageMetadata(packageId, includedApps = [], language = "vietnamese") {
@@ -616,12 +645,88 @@ app.get('/api/cache/status', (req, res) => {
   res.json({ type: "memory", entries: cache.size, maxEntries: CACHE_MAX_ENTRIES, ...cacheStats });
 });
 
+function alertCredentials(req) {
+  const authorization = String(req.get("authorization") || "");
+  return {
+    clientId: String(req.get("x-alert-client-id") || req.body?.clientId || ""),
+    clientSecret: authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : String(req.body?.clientSecret || "")
+  };
+}
+
+function secureStringEqual(actual, expected) {
+  const left = createHash("sha256").update(String(actual)).digest();
+  const right = createHash("sha256").update(String(expected)).digest();
+  return timingSafeEqual(left, right);
+}
+
+app.get('/api/alerts/status', (req, res) => {
+  res.json(getCloudAlertCapabilities());
+});
+
+app.post('/api/alerts/sync', async (req, res) => {
+  try {
+    const credentials = alertCredentials(req);
+    const result = await syncCloudAlerts({
+      ...req.body,
+      clientId: credentials.clientId,
+      clientSecret: credentials.clientSecret
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ error: error.message || "Không thể đồng bộ Cloud Alerts." });
+  }
+});
+
+app.post('/api/alerts/test', async (req, res) => {
+  try {
+    const { clientId, clientSecret } = alertCredentials(req);
+    const result = await sendCloudAlertTest(clientId, clientSecret);
+    res.status(result.success ? 200 : 502).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ error: error.message || "Không thể gửi thông báo thử." });
+  }
+});
+
+app.delete('/api/alerts', async (req, res) => {
+  try {
+    const { clientId, clientSecret } = alertCredentials(req);
+    res.json(await disableCloudAlerts(clientId, clientSecret));
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ error: error.message || "Không thể tắt Cloud Alerts." });
+  }
+});
+
+async function handleCloudAlertCron(req, res) {
+  const cronSecret = String(process.env.CRON_SECRET || "");
+  const authorization = String(req.get("authorization") || "");
+  const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!cronSecret) return res.status(503).json({ error: "CRON_SECRET chưa được cấu hình." });
+  if (!supplied || !secureStringEqual(supplied, cronSecret)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    res.json(await runCloudAlertChecks({ getQuote: getCloudAlertQuote, concurrency: 4 }));
+  } catch (error) {
+    console.error("Cloud Alert Cron Error:", error.message);
+    res.status(500).json({ error: "Không thể hoàn tất lượt kiểm tra giá." });
+  }
+}
+
+app.get('/api/cron/check-alerts', handleCloudAlertCron);
+app.post('/api/cron/check-alerts', handleCloudAlertCron);
+
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Steam Price Comparator: http://localhost:${PORT}`);
-});
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+const server = isDirectRun
+  ? app.listen(PORT, () => {
+      console.log(`Steam Price Comparator: http://localhost:${PORT}`);
+    })
+  : null;
 
 export { app, server };
+export default app;
