@@ -2619,16 +2619,24 @@ function setupGameExtraTools(appId) {
 
   specsTabBtn.onclick = () => {
     specsTabBtn.classList.add("active");
+    specsTabBtn.classList.remove("btn-secondary");
+    specsTabBtn.classList.add("btn-primary");
     bundleTabBtn.classList.remove("active");
-    specsContent.classList.remove("hidden");
-    bundleContent.classList.add("hidden");
+    bundleTabBtn.classList.remove("btn-primary");
+    bundleTabBtn.classList.add("btn-secondary");
+    if (specsContent) specsContent.style.display = "block";
+    if (bundleContent) bundleContent.style.display = "none";
   };
 
   bundleTabBtn.onclick = () => {
     bundleTabBtn.classList.add("active");
+    bundleTabBtn.classList.remove("btn-secondary");
+    bundleTabBtn.classList.add("btn-primary");
     specsTabBtn.classList.remove("active");
-    bundleContent.classList.remove("hidden");
-    specsContent.classList.add("hidden");
+    specsTabBtn.classList.remove("btn-primary");
+    specsTabBtn.classList.add("btn-secondary");
+    if (bundleContent) bundleContent.style.display = "block";
+    if (specsContent) specsContent.style.display = "none";
     if (targetId) fetchBundleData(targetId);
   };
 
