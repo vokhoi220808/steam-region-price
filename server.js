@@ -866,14 +866,30 @@ app.get('/api/purchase-advice/:appId', async (req, res, next) => {
 
 app.get('/api/wishlist/compare', async (req, res, next) => {
   try {
-    const rawIds = String(req.query.steamIds || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const rawInput = String(req.query.steamIds || '');
+    const tokens = rawInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
     const steamIds = [];
-    for (const raw of rawIds) {
-      const match = raw.match(/(\d{17})/);
-      if (match) steamIds.push(match[1]);
+
+    for (const raw of tokens) {
+      const match17 = raw.match(/(\d{17})/);
+      if (match17) {
+        steamIds.push(match17[1]);
+      } else {
+        const vanityMatch = raw.match(/steamcommunity\.com\/id\/([^\/]+)/) || [null, raw];
+        const vanityName = vanityMatch[1]?.replace(/[^a-zA-Z0-9_-]/g, "");
+        if (vanityName) {
+          try {
+            const xmlRes = await fetch(`https://steamcommunity.com/id/${vanityName}/?xml=1`, { signal: AbortSignal.timeout(6000) });
+            const xmlText = await xmlRes.text();
+            const idMatch = xmlText.match(/<steamID64>(\d{17})<\/steamID64>/);
+            if (idMatch) steamIds.push(idMatch[1]);
+          } catch (e) {}
+        }
+      }
     }
+
     if (steamIds.length < 2) {
-      return res.status(400).json({ error: "Cần ít nhất 2 Steam ID (17 chữ số) để so sánh." });
+      return res.status(400).json({ error: "Cần ít nhất 2 Steam ID (17 chữ số) hoặc Link Profile công khai để so sánh." });
     }
     const results = await Promise.allSettled(steamIds.map((id) => getWishlist(id)));
     const wishlists = [];

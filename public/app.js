@@ -1624,6 +1624,9 @@ function setupEvents() {
       historyModal.setAttribute("aria-hidden", "false");
       closeHistoryBtn?.focus();
       renderPriceHistoryChart();
+      if (typeof setupGameExtraTools === "function" && state.currentData?.appId) {
+        setupGameExtraTools(state.currentData.appId);
+      }
     });
   }
   
@@ -2470,39 +2473,49 @@ function initBudgetComboModal() {
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
 
-  runBtn?.addEventListener("click", () => {
+  runBtn?.addEventListener("click", async () => {
     const budget = Number(input?.value);
     if (!budget || budget <= 0) {
       results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Vui lòng nhập ngân sách hợp lệ (ví dụ: 150000 VNĐ).</div>`;
       return;
     }
 
-    const availableItems = (dealsData?.specials?.items || dealsData?.deep_discounts?.items || [])
-      .filter(d => Number(d.final_price || d.finalPrice || 0) > 0);
+    results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite;">🔄 Đang quét live danh sách deal từ Steam API...</div></div>`;
 
-    if (!availableItems.length) {
-      results.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:12px;">Đang tải dữ liệu deal, vui lòng thử lại sau 2 giây...</div>`;
+    let pool = [];
+    try {
+      if (!dealsData?.specials?.items?.length) {
+        const res = await fetch(`/api/deals?category=specials&cc=${state.region || 'vn'}`);
+        const d = await res.json();
+        pool = (d.items || []).filter(item => Number(item.final_price || item.finalPrice || 0) > 0);
+      } else {
+        pool = (dealsData.specials.items || []).filter(d => Number(d.final_price || d.finalPrice || 0) > 0);
+      }
+    } catch (e) {}
+
+    if (!pool.length) {
+      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Không thể tải dữ liệu deal từ Steam. Vui lòng kiểm tra lại kết nối.</div>`;
       return;
     }
 
     // Run Knapsack subset-sum algorithm for combos of 2 to 4 games
     const combos = [];
-    const n = Math.min(availableItems.length, 40);
-    const pool = availableItems.slice(0, n);
+    const n = Math.min(pool.length, 50);
+    const subPool = pool.slice(0, n);
 
-    for (let i = 0; i < pool.length; i++) {
-      for (let j = i + 1; j < pool.length; j++) {
-        const p1 = Number(pool[i].final_price || pool[i].finalPrice || 0);
-        const p2 = Number(pool[j].final_price || pool[j].finalPrice || 0);
+    for (let i = 0; i < subPool.length; i++) {
+      for (let j = i + 1; j < subPool.length; j++) {
+        const p1 = Number(subPool[i].final_price || subPool[i].finalPrice || 0);
+        const p2 = Number(subPool[j].final_price || subPool[j].finalPrice || 0);
         const total2 = p1 + p2;
-        if (total2 <= budget && total2 >= budget * 0.75) {
-          combos.push({ items: [pool[i], pool[j]], totalPrice: total2 });
+        if (total2 <= budget && total2 >= budget * 0.7) {
+          combos.push({ items: [subPool[i], subPool[j]], totalPrice: total2 });
         }
-        for (let k = j + 1; k < pool.length; k++) {
-          const p3 = Number(pool[k].final_price || pool[k].finalPrice || 0);
+        for (let k = j + 1; k < subPool.length; k++) {
+          const p3 = Number(subPool[k].final_price || subPool[k].finalPrice || 0);
           const total3 = total2 + p3;
-          if (total3 <= budget && total3 >= budget * 0.8) {
-            combos.push({ items: [pool[i], pool[j], pool[k]], totalPrice: total3 });
+          if (total3 <= budget && total3 >= budget * 0.75) {
+            combos.push({ items: [subPool[i], subPool[j], subPool[k]], totalPrice: total3 });
           }
         }
       }
@@ -2592,6 +2605,7 @@ function initCoopWishlistModal() {
 
 // 3 & 4. REALTIME SYSTEM REQUIREMENTS MATCHER & SMART BUNDLE SAVINGS
 function setupGameExtraTools(appId) {
+  const targetId = appId || state.currentData?.appId;
   const specsTabBtn = document.getElementById("tabPcSpecsBtn");
   const bundleTabBtn = document.getElementById("tabBundleSavingsBtn");
   const specsContent = document.getElementById("pcSpecsTabContent");
@@ -2615,7 +2629,7 @@ function setupGameExtraTools(appId) {
     specsTabBtn.classList.remove("active");
     bundleContent.classList.remove("hidden");
     specsContent.classList.add("hidden");
-    fetchBundleData(appId);
+    if (targetId) fetchBundleData(targetId);
   };
 
   function evaluateHardware() {
@@ -2649,7 +2663,7 @@ function setupGameExtraTools(appId) {
   evaluateHardware();
 
   async function fetchBundleData(id) {
-    if (!bundleResult) return;
+    if (!bundleResult || !id) return;
     bundleResult.innerHTML = `<div style="text-align:center; padding:10px;">🔄 Đang lấy thông tin gói Bundle & DLC...</div>`;
     try {
       const res = await fetch(`/api/bundle/savings/${id}`);
