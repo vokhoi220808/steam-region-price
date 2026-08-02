@@ -483,8 +483,8 @@
         <div class="sale-calendar-grid hidden" id="saleCalendarGrid"></div>
       </section>
 
-      <!-- TABS -->
-      <div class="deals-tabs-container" style="display: flex; justify-content: center; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
+      <!-- TABS & ADVANCED REALTIME TOOLS -->
+      <div class="deals-tabs-container" style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
         <div class="deals-tabs" style="display: flex; gap: 8px; background: var(--surface-elevated); padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
           <button class="btn deal-tab-btn" data-category="personalized" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">✨ Dành cho bạn</button>
           <button class="btn active deal-tab-btn" data-category="specials" style="background: var(--primary-soft); color: var(--primary); border: 1px solid var(--primary-soft); border-radius: var(--radius-sm); font-weight: 600;">Khuyến mãi nổi bật</button>
@@ -492,6 +492,11 @@
           <button class="btn deal-tab-btn" data-category="free" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Game Miễn Phí</button>
           <button class="btn deal-tab-btn" data-category="top_sellers" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Bán chạy</button>
           <button class="btn deal-tab-btn" data-category="new_releases" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Mới giảm giá</button>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-small" id="openBudgetComboBtn" style="gap: 6px; font-weight: 600; border-color: rgba(59,130,246,0.4); color: var(--primary);">🎯 Combo Khít Ngân Sách</button>
+          <button class="btn btn-secondary btn-small" id="openCoopWishlistBtn" style="gap: 6px; font-weight: 600; border-color: rgba(16,185,129,0.4); color: var(--success);">👥 Match Wishlist Bạn Bè</button>
         </div>
       </div>
 
@@ -753,6 +758,78 @@
       </div>
       <p class="history-note-real" data-i18n="history_note_real" style="margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center;">* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại.</p>
       <p class="history-note-simulated hidden">Dữ liệu mô phỏng từ mức giá hiện tại, chỉ dùng để xem thử xu hướng và không phải lịch sử giá Steam.</p>
+
+      <!-- REALTIME HARDWARE MATCH & SMART BUNDLE SAVINGS CONTAINER -->
+      <div id="gameExtraRealtimeTools" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+          <button id="tabPcSpecsBtn" class="btn btn-secondary btn-small active" style="flex: 1;">🖥️ Kiểm tra Cấu hình PC</button>
+          <button id="tabBundleSavingsBtn" class="btn btn-secondary btn-small" style="flex: 1;">📦 Tiết kiệm Bundle & DLC</button>
+        </div>
+        
+        <!-- PC Specs Tab -->
+        <div id="pcSpecsTabContent">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
+            <select id="userGpuSelect" style="height: 36px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
+              <option value="rtx3060">GPU: RTX 3060 / RX 6600 (Tốt)</option>
+              <option value="gtx1650">GPU: GTX 1650 / RX 570 (Trung bình)</option>
+              <option value="gtx1050ti">GPU: GTX 1050 Ti (Tối thiểu)</option>
+              <option value="rtx4070">GPU: RTX 4070 / RX 7800 (Cao cấp)</option>
+              <option value="igpu">GPU: Intel Iris / Vega iGPU (Yếu)</option>
+            </select>
+            <select id="userRamSelect" style="height: 36px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
+              <option value="16">RAM: 16 GB</option>
+              <option value="8">RAM: 8 GB</option>
+              <option value="32">RAM: 32 GB</option>
+            </select>
+          </div>
+          <div id="pcHardwareAssessment" style="padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+            Đang bóc tách yêu cầu phần cứng từ Steam...
+          </div>
+        </div>
+        
+        <!-- Bundle Tab -->
+        <div id="bundleSavingsTabContent" class="hidden">
+          <div id="bundleSavingsResult" style="padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+            Đang quét thông tin gói Package & DLC từ Steam...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUDGET COMBO FINDER MODAL -->
+  <div id="budgetComboModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 640px; padding: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">🎯 Săn Combo Khít Ngân Sách Realtime</h3>
+        <button id="closeBudgetComboModal" class="btn icon-only" style="font-size: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+      </div>
+      <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Nhập số tiền lẻ khả dụng trong ví của bạn (VNĐ). Thuật toán Knapsack sẽ quét live danh sách game giảm giá trên Steam và tìm combo 2–4 game tối ưu nhất!</p>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 24px;">
+        <input type="number" id="budgetComboInput" placeholder="Ví dụ: 150000" style="flex: 1; height: 42px; padding: 0 14px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text-primary); outline: none;">
+        <button id="runBudgetComboBtn" class="btn btn-primary" style="height: 42px; padding: 0 20px; font-weight: 700;">Tìm Combo Ngay</button>
+      </div>
+      
+      <div id="budgetComboResults" style="display: flex; flex-direction: column; gap: 16px;"></div>
+    </div>
+  </div>
+
+  <!-- CO-OP WISHLIST MATCHER MODAL -->
+  <div id="coopWishlistModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 680px; padding: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">👥 Match Wishlist Bạn Bè Realtime</h3>
+        <button id="closeCoopWishlistModal" class="btn icon-only" style="font-size: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+      </div>
+      <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Nhập 2 đến 5 Steam ID (17 chữ số) hoặc link profile của nhóm bạn. Máy chủ sẽ truy vấn live Wishlist công khai và tự động lọc ra các tựa game trùng khớp mà mọi người cùng muốn mua!</p>
+      
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+        <textarea id="coopWishlistInput" rows="3" placeholder="Nhập từng Steam ID hoặc link profile phân cách bằng dấu phẩy&#10;Ví dụ: 76561198012345678, 76561198087654321" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit;"></textarea>
+        <button id="runCoopWishlistBtn" class="btn btn-primary" style="height: 42px; font-weight: 700; align-self: flex-end; padding: 0 24px;">So Sánh Wishlist Nhóm</button>
+      </div>
+      
+      <div id="coopWishlistResults" style="display: flex; flex-direction: column; gap: 12px;"></div>
     </div>
   </div>
 

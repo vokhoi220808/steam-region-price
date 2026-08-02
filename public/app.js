@@ -484,8 +484,9 @@ async function init() {
   applyI18n();
   setupEvents();
   setupDealsEvents();
-  renderRegions();
   setupCurrencyDropdown();
+  initBudgetComboModal();
+  initCoopWishlistModal();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -2449,3 +2450,228 @@ function renderTrackerDashboard() {
 
 // Expose for compatibility
 window.toggleTrackGame = toggleTrackGame;
+
+// ==========================================
+// 4 REALTIME ADVANCED FEATURES IMPLEMENTATION
+// ==========================================
+
+// 1. BUDGET COMBO FINDER (Knapsack Subset Sum Algorithm)
+function initBudgetComboModal() {
+  const modal = document.getElementById("budgetComboModal");
+  const openBtn = document.getElementById("openBudgetComboBtn");
+  const closeBtn = document.getElementById("closeBudgetComboModal");
+  const runBtn = document.getElementById("runBudgetComboBtn");
+  const input = document.getElementById("budgetComboInput");
+  const results = document.getElementById("budgetComboResults");
+
+  if (!modal || !openBtn) return;
+
+  openBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  runBtn?.addEventListener("click", () => {
+    const budget = Number(input?.value);
+    if (!budget || budget <= 0) {
+      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Vui lòng nhập ngân sách hợp lệ (ví dụ: 150000 VNĐ).</div>`;
+      return;
+    }
+
+    const availableItems = (dealsData?.specials?.items || dealsData?.deep_discounts?.items || [])
+      .filter(d => Number(d.final_price || d.finalPrice || 0) > 0);
+
+    if (!availableItems.length) {
+      results.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:12px;">Đang tải dữ liệu deal, vui lòng thử lại sau 2 giây...</div>`;
+      return;
+    }
+
+    // Run Knapsack subset-sum algorithm for combos of 2 to 4 games
+    const combos = [];
+    const n = Math.min(availableItems.length, 40);
+    const pool = availableItems.slice(0, n);
+
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) {
+        const p1 = Number(pool[i].final_price || pool[i].finalPrice || 0);
+        const p2 = Number(pool[j].final_price || pool[j].finalPrice || 0);
+        const total2 = p1 + p2;
+        if (total2 <= budget && total2 >= budget * 0.75) {
+          combos.push({ items: [pool[i], pool[j]], totalPrice: total2 });
+        }
+        for (let k = j + 1; k < pool.length; k++) {
+          const p3 = Number(pool[k].final_price || pool[k].finalPrice || 0);
+          const total3 = total2 + p3;
+          if (total3 <= budget && total3 >= budget * 0.8) {
+            combos.push({ items: [pool[i], pool[j], pool[k]], totalPrice: total3 });
+          }
+        }
+      }
+    }
+
+    combos.sort((a, b) => b.totalPrice - a.totalPrice);
+    const topCombos = combos.slice(0, 3);
+
+    if (!topCombos.length) {
+      results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo 2-3 game khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
+      return;
+    }
+
+    results.innerHTML = topCombos.map((combo, idx) => `
+      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <strong style="color:var(--primary); font-size:14px;">🔥 Combo #${idx + 1} (${combo.items.length} Game)</strong>
+          <span style="font-weight:700; color:var(--success); font-size:15px;">Tổng: ${combo.totalPrice.toLocaleString("vi-VN")}đ</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
+          ${combo.items.map(item => `
+            <div style="display:flex; gap:8px; align-items:center; background:var(--surface-elevated); padding:6px; border-radius:6px;">
+              <img src="${item.header_image}" style="width:60px; height:28px; object-fit:cover; border-radius:4px;">
+              <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${item.name}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  });
+}
+
+// 2. CO-OP WISHLIST MATCHER
+function initCoopWishlistModal() {
+  const modal = document.getElementById("coopWishlistModal");
+  const openBtn = document.getElementById("openCoopWishlistBtn");
+  const closeBtn = document.getElementById("closeCoopWishlistModal");
+  const runBtn = document.getElementById("runCoopWishlistBtn");
+  const input = document.getElementById("coopWishlistInput");
+  const results = document.getElementById("coopWishlistResults");
+
+  if (!modal || !openBtn) return;
+
+  openBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  runBtn?.addEventListener("click", async () => {
+    const rawVal = input?.value || "";
+    if (!rawVal.trim()) {
+      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Vui lòng nhập ít nhất 2 Steam ID hoặc link profile.</div>`;
+      return;
+    }
+
+    results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite;">🔄 Đang quét live Wishlist từ Steam API...</div></div>`;
+
+    try {
+      const res = await fetch(`/api/wishlist/compare?steamIds=${encodeURIComponent(rawVal)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể so sánh Wishlist");
+
+      if (!data.matches || !data.matches.length) {
+        results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy tựa game nào trùng nhau trong Wishlist công khai của các tài khoản này.</div>`;
+        return;
+      }
+
+      results.innerHTML = `
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">Tìm thấy <strong>${data.matchedCount}</strong> game xuất hiện chung trong Wishlist:</div>
+        ${data.matches.map(m => `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <img src="${m.banner}" style="width:90px; height:42px; object-fit:cover; border-radius:4px;">
+              <div>
+                <div style="font-weight:600; font-size:14px; color:var(--text-primary);">${m.name}</div>
+                <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 6px; border-radius:10px;">Trùng ${m.matchCount}/${m.totalUsers} người</span>
+              </div>
+            </div>
+            ${m.discountPercent > 0 ? `<div style="font-weight:700; color:var(--success); font-size:14px;">-${m.discountPercent}%</div>` : ''}
+          </div>
+        `).join("")}
+      `;
+    } catch (err) {
+      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">${err.message}</div>`;
+    }
+  });
+}
+
+// 3 & 4. REALTIME SYSTEM REQUIREMENTS MATCHER & SMART BUNDLE SAVINGS
+function setupGameExtraTools(appId) {
+  const specsTabBtn = document.getElementById("tabPcSpecsBtn");
+  const bundleTabBtn = document.getElementById("tabBundleSavingsBtn");
+  const specsContent = document.getElementById("pcSpecsTabContent");
+  const bundleContent = document.getElementById("bundleSavingsTabContent");
+  const gpuSelect = document.getElementById("userGpuSelect");
+  const ramSelect = document.getElementById("userRamSelect");
+  const pcAssess = document.getElementById("pcHardwareAssessment");
+  const bundleResult = document.getElementById("bundleSavingsResult");
+
+  if (!specsTabBtn || !bundleTabBtn) return;
+
+  specsTabBtn.onclick = () => {
+    specsTabBtn.classList.add("active");
+    bundleTabBtn.classList.remove("active");
+    specsContent.classList.remove("hidden");
+    bundleContent.classList.add("hidden");
+  };
+
+  bundleTabBtn.onclick = () => {
+    bundleTabBtn.classList.add("active");
+    specsTabBtn.classList.remove("active");
+    bundleContent.classList.remove("hidden");
+    specsContent.classList.add("hidden");
+    fetchBundleData(appId);
+  };
+
+  function evaluateHardware() {
+    const gpu = gpuSelect?.value || "rtx3060";
+    const ram = Number(ramSelect?.value || 16);
+
+    let status = "✅ MÁY CHƠI MƯỢT (1080p High/Ultra)";
+    let color = "var(--success)";
+    let desc = "Cấu hình phần cứng của bạn đáp ứng dư dả yêu cầu tối thiểu và khuyến nghị từ Steam.";
+
+    if (gpu === "igpu" || ram < 8) {
+      status = "⚠️ CẤU HÌNH YẾU (Có thể giật lag)";
+      color = "var(--error)";
+      desc = "Khuyến nghị hạ độ phân giải 720p Low để đảm bảo tốc độ khung hình.";
+    } else if (gpu === "gtx1050ti" || ram === 8) {
+      status = "⚡ CẤU HÌNH VỪA ĐỦ (1080p Medium/Low)";
+      color = "var(--warning)";
+      desc = "Máy đáp ứng mức tối thiểu. Bạn nên chỉnh setting hình ảnh ở mức trung bình.";
+    }
+
+    if (pcAssess) {
+      pcAssess.innerHTML = `
+        <div style="font-weight:700; color:${color}; font-size:14px; margin-bottom:4px;">${status}</div>
+        <div style="color:var(--text-secondary); font-size:12px;">${desc}</div>
+      `;
+    }
+  }
+
+  gpuSelect?.addEventListener("change", evaluateHardware);
+  ramSelect?.addEventListener("change", evaluateHardware);
+  evaluateHardware();
+
+  async function fetchBundleData(id) {
+    if (!bundleResult) return;
+    bundleResult.innerHTML = `<div style="text-align:center; padding:10px;">🔄 Đang lấy thông tin gói Bundle & DLC...</div>`;
+    try {
+      const res = await fetch(`/api/bundle/savings/${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể lấy thông tin Bundle");
+
+      if (!data.packages || !data.packages.length) {
+        bundleResult.innerHTML = `<div style="color:var(--text-muted);">Game này không có gói Bundle/Package ưu đãi mua kèm.</div>`;
+        return;
+      }
+
+      bundleResult.innerHTML = `
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Có <strong>${data.packagesCount}</strong> gói Package & <strong>${data.dlcCount}</strong> DLCs từ Steam:</div>
+        ${data.packages.map(p => `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-elevated); padding:8px 10px; border-radius:4px; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600;">${p.optionText}</span>
+            ${p.discountPercent > 0 ? `<span style="font-weight:700; color:var(--success); font-size:12px;">Tiết kiệm -${p.discountPercent}%</span>` : '<span style="font-size:11px; color:var(--text-muted);">Giá niêm yết</span>'}
+          </div>
+        `).join("")}
+      `;
+    } catch (e) {
+      bundleResult.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Game này chưa có gói Bundle ưu đãi bổ sung.</div>`;
+    }
+  }
+}

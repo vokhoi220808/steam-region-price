@@ -106,7 +106,7 @@ function accountView(account) {
   };
 }
 
-async function getWishlist(steamId) {
+export async function getWishlist(steamId) {
   const all = [];
   for (let page = 0; page < 20; page += 1) {
     const response = await fetch(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=${page}`, {

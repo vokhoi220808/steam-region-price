@@ -12,7 +12,7 @@ import {
   sendCloudAlertTest,
   syncCloudAlerts
 } from "./server/cloud-alerts.js";
-import { attachAccountSession, createAccountRouter } from "./server/account.js";
+import { attachAccountSession, createAccountRouter, getWishlist } from "./server/account.js";
 import { createPushRouter, sendUserPush } from "./server/push.js";
 import { getInternalHistory, getPurchaseAdvice, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
 import { createReliabilityRouter, distributedCacheGet, distributedCacheSet, finishCronRun, rateLimit, startCronRun, updateServiceHealth } from "./server/reliability.js";
@@ -861,6 +861,90 @@ app.get('/api/purchase-advice/:appId', async (req, res, next) => {
       stats: history?.stats
     });
     res.json(advice);
+app.get('/api/wishlist/compare', async (req, res, next) => {
+  try {
+    const rawIds = String(req.query.steamIds || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const steamIds = [];
+    for (const raw of rawIds) {
+      const match = raw.match(/(\d{17})/);
+      if (match) steamIds.push(match[1]);
+    }
+    if (steamIds.length < 2) {
+      return res.status(400).json({ error: "Cần ít nhất 2 Steam ID (17 chữ số) để so sánh." });
+    }
+    const results = await Promise.allSettled(steamIds.map((id) => getWishlist(id)));
+    const wishlists = [];
+    const errors = [];
+    results.forEach((r, idx) => {
+      if (r.status === "fulfilled") wishlists.push({ steamId: steamIds[idx], items: r.value });
+      else errors.push({ steamId: steamIds[idx], error: r.reason?.message || "Không thể lấy Wishlist" });
+    });
+    if (wishlists.length < 2) {
+      return res.status(400).json({ error: "Cần ít nhất 2 tài khoản có Wishlist công khai.", details: errors });
+    }
+    const counts = new Map();
+    const metaMap = new Map();
+    for (const w of wishlists) {
+      const seen = new Set();
+      for (const item of w.items) {
+        if (!seen.has(item.appId)) {
+          seen.add(item.appId);
+          counts.set(item.appId, (counts.get(item.appId) || 0) + 1);
+          if (item.metadata && !metaMap.has(item.appId)) metaMap.set(item.appId, item.metadata);
+        }
+      }
+    }
+    const matches = [];
+    for (const [appId, count] of counts.entries()) {
+      if (count >= 2) {
+        const meta = metaMap.get(appId) || {};
+        matches.push({
+          appId,
+          matchCount: count,
+          totalUsers: wishlists.length,
+          name: meta.name || `App ${appId}`,
+          banner: meta.capsule || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+          discountPercent: meta.discount_pct || 0,
+          priceAmount: meta.subs?.[0]?.price || null,
+          isFree: Boolean(meta.is_free_game),
+          type: meta.type || "game"
+        });
+      }
+    }
+    matches.sort((a, b) => b.matchCount - a.matchCount || b.discountPercent - a.discountPercent);
+    res.json({ success: true, matchedCount: matches.length, totalAnalyzed: wishlists.length, matches, errors });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/bundle/savings/:appId', async (req, res, next) => {
+  try {
+    const appId = Number(req.params.appId);
+    if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: "App ID không hợp lệ." });
+    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=vn&l=vietnamese`, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error("Steam API Error");
+    const json = await response.json();
+    const appData = json?.[appId]?.data;
+    if (!appData) return res.status(404).json({ error: "Không tìm thấy thông tin game trên Steam." });
+
+    const packages = appData.package_groups?.[0]?.subs || [];
+    const dlcIds = appData.dlc || [];
+    
+    res.json({
+      success: true,
+      appId,
+      name: appData.name,
+      isFree: appData.is_free,
+      headerImage: appData.header_image,
+      packagesCount: packages.length,
+      dlcCount: dlcIds.length,
+      packages: packages.map(p => ({
+        packageId: p.packageid,
+        optionText: p.option_text,
+        priceInCents: p.price_in_cents_with_discount,
+        discountPercent: p.percent_savings
+      })),
+      pcRequirements: appData.pc_requirements || {}
+    });
   } catch (error) { next(error); }
 });
 
