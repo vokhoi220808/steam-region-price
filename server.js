@@ -852,6 +852,27 @@ async function handleCloudAlertCron(req, res) {
   }
 }
 
+// System Requirements from Steam Store API
+app.get('/api/sysreqs/:appId', async (req, res, next) => {
+  try {
+    const appId = req.params.appId;
+    const url = `https://store.steampowered.com/api/appdetails?appids=${appId}&filters=pc_requirements,name&cc=us&l=english`;
+    const data = await fetchJson(url);
+    const appData = data?.[appId]?.data;
+    if (!appData) return res.status(404).json({ error: 'Game not found' });
+
+    // Parse HTML requirements into plain text
+    const stripHtml = (html = '') => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const pcReqs = appData.pc_requirements || {};
+
+    res.json({
+      name: appData.name,
+      minimum: stripHtml(pcReqs.minimum || ''),
+      recommended: stripHtml(pcReqs.recommended || '')
+    });
+  } catch (error) { next(error); }
+});
+
 app.get('/api/purchase-advice/:appId', async (req, res, next) => {
   try {
     const appId = Number(req.params.appId);

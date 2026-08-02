@@ -2639,35 +2639,103 @@ function setupGameExtraTools(appId) {
     if (targetId) fetchBundleData(targetId);
   };
 
-  function evaluateHardware() {
+  // GPU tier ranking (higher = better)
+  const GPU_TIER = {
+    igpu: 0, gtx1050ti: 2, gtx1650: 3, rtx3060: 5, rtx4070: 7
+  };
+
+  async function fetchAndEvaluateSpecs() {
+    if (!pcAssess || !targetId) return;
     const gpu = gpuSelect?.value || "rtx3060";
     const ram = Number(ramSelect?.value || 16);
 
-    let status = "✅ MÁY CHƠI MƯỢT (1080p High/Ultra)";
-    let color = "var(--success)";
-    let desc = "Cấu hình phần cứng của bạn đáp ứng dư dả yêu cầu tối thiểu và khuyến nghị từ Steam.";
+    pcAssess.innerHTML = `<div style="color:var(--text-muted);font-size:12px;">🔄 Đang lấy yêu cầu hệ thống từ Steam...</div>`;
 
-    if (gpu === "igpu" || ram < 8) {
-      status = "⚠️ CẤU HÌNH YẾU (Có thể giật lag)";
-      color = "var(--error)";
-      desc = "Khuyến nghị hạ độ phân giải 720p Low để đảm bảo tốc độ khung hình.";
-    } else if (gpu === "gtx1050ti" || ram === 8) {
-      status = "⚡ CẤU HÌNH VỪA ĐỦ (1080p Medium/Low)";
-      color = "var(--warning)";
-      desc = "Máy đáp ứng mức tối thiểu. Bạn nên chỉnh setting hình ảnh ở mức trung bình.";
-    }
+    try {
+      const res = await fetch(`/api/sysreqs/${targetId}`);
+      const data = await res.json();
+      if (!res.ok || (!data.minimum && !data.recommended)) throw new Error("no_data");
 
-    if (pcAssess) {
+      const text = (data.minimum + " " + data.recommended).toLowerCase();
+
+      // Parse RAM requirement from text (e.g. "8 gb ram", "16gb")
+      const ramMatch = text.match(/(\d+)\s*gb\s*(?:of\s*)?ram/);
+      const reqRam = ramMatch ? Number(ramMatch[1]) : 8;
+
+      // Parse GPU from text - find highest mentioned GPU tier
+      const GPU_KEYWORDS = [
+        { keys: ["rtx 4070","rtx4070","rx 7800"], tier: 7, label: "RTX 4070 / RX 7800" },
+        { keys: ["rtx 3060","rtx3060","rx 6600"], tier: 5, label: "RTX 3060 / RX 6600" },
+        { keys: ["gtx 1650","gtx1650","rx 570"], tier: 3, label: "GTX 1650 / RX 570" },
+        { keys: ["gtx 1050","gtx1050"], tier: 2, label: "GTX 1050 Ti" },
+        { keys: ["intel iris","intel hd","igpu","integrated"], tier: 0, label: "Intel iGPU" },
+      ];
+
+      let reqGpuTier = 2; // default minimum
+      let reqGpuLabel = "GTX 1050 Ti";
+      for (const g of GPU_KEYWORDS) {
+        if (g.keys.some(k => text.includes(k))) {
+          reqGpuTier = g.tier;
+          reqGpuLabel = g.label;
+          break;
+        }
+      }
+
+      const userTier = GPU_TIER[gpu] ?? 3;
+      const ramOk = ram >= reqRam;
+      const gpuOk = userTier >= reqGpuTier;
+      const gpuExceed = userTier > reqGpuTier + 1;
+
+      let icon, color, verdict, detail;
+      if (gpuOk && gpuExceed && ramOk) {
+        icon = "✅"; color = "var(--success)";
+        verdict = "Máy chơi MƯỢT – 1080p High/Ultra";
+        detail = `GPU của bạn mạnh hơn yêu cầu đề xuất (${reqGpuLabel}). RAM đủ (${reqRam}GB yêu cầu, bạn có ${ram}GB).`;
+      } else if (gpuOk && ramOk) {
+        icon = "⚡"; color = "#f59e0b";
+        verdict = "Máy đủ – 1080p Medium";
+        detail = `GPU đáp ứng yêu cầu (${reqGpuLabel}). RAM đủ. Chỉnh Medium settings để ổn định FPS.`;
+      } else if (!gpuOk && !ramOk) {
+        icon = "❌"; color = "var(--error)";
+        verdict = "Máy KHÔNG đủ cấu hình";
+        detail = `Game yêu cầu tối thiểu ${reqGpuLabel} và ${reqRam}GB RAM. Máy bạn có thể không chạy được hoặc rất lag.`;
+      } else if (!gpuOk) {
+        icon = "⚠️"; color = "var(--error)";
+        verdict = "GPU yếu – Có thể lag";
+        detail = `GPU yêu cầu tối thiểu: ${reqGpuLabel}. RAM của bạn đủ (${ram}GB). Hạ xuống 720p Low.`;
+      } else {
+        icon = "⚠️"; color = "#f59e0b";
+        verdict = "RAM thiếu – Có thể giật";
+        detail = `Game yêu cầu ${reqRam}GB RAM, bạn chỉ có ${ram}GB. GPU đủ. Nâng cấp RAM để trải nghiệm tốt hơn.`;
+      }
+
+      // Show game's actual requirements
+      const minSnip = data.minimum ? data.minimum.substring(0, 200) : "";
       pcAssess.innerHTML = `
-        <div style="font-weight:700; color:${color}; font-size:14px; margin-bottom:4px;">${status}</div>
-        <div style="color:var(--text-secondary); font-size:12px;">${desc}</div>
+        <div style="font-weight:700; color:${color}; font-size:15px; margin-bottom:6px;">${icon} ${verdict}</div>
+        <div style="color:var(--text-secondary); font-size:12px; margin-bottom:10px;">${detail}</div>
+        ${minSnip ? `<details style="cursor:pointer;">
+          <summary style="font-size:11px; color:var(--text-muted); user-select:none;">📋 Yêu cầu tối thiểu từ Steam</summary>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.6;">${minSnip}${data.minimum.length > 200 ? '...' : ''}</div>
+        </details>` : ''}
+      `;
+    } catch (e) {
+      // Fallback: generic assessment
+      const userTier = GPU_TIER[gpuSelect?.value || "rtx3060"] ?? 3;
+      const ram = Number(ramSelect?.value || 16);
+      let icon = "✅", color = "var(--success)", msg = "Cấu hình tốt – chạy được hầu hết game hiện đại.";
+      if (userTier <= 0 || ram < 8) { icon = "❌"; color = "var(--error)"; msg = "Cấu hình yếu – có thể không chạy được game nặng."; }
+      else if (userTier <= 2 || ram <= 8) { icon = "⚠️"; color = "#f59e0b"; msg = "Cấu hình tối thiểu – chỉnh Low settings."; }
+      pcAssess.innerHTML = `
+        <div style="font-weight:700; color:${color}; font-size:14px;">${icon} ${msg}</div>
+        <div style="color:var(--text-muted); font-size:11px; margin-top:4px;">(Không lấy được yêu cầu cụ thể từ Steam cho game này)</div>
       `;
     }
   }
 
-  gpuSelect?.addEventListener("change", evaluateHardware);
-  ramSelect?.addEventListener("change", evaluateHardware);
-  evaluateHardware();
+  gpuSelect?.addEventListener("change", fetchAndEvaluateSpecs);
+  ramSelect?.addEventListener("change", fetchAndEvaluateSpecs);
+  fetchAndEvaluateSpecs();
 
   async function fetchBundleData(id) {
     if (!bundleResult || !id) return;
