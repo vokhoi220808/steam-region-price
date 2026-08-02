@@ -487,7 +487,6 @@ async function init() {
   setupCurrencyDropdown();
   initBudgetComboModal();
   initCoopWishlistModal();
-  initGameHelperModal();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
