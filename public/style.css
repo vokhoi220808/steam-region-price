@@ -673,7 +673,7 @@ select option {
 .sale-calendar-skeleton { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 10px; }
 .sale-calendar-skeleton span { height: 92px; border-radius: var(--radius-md); background: var(--border); animation: pulse 1.5s infinite ease-in-out; }
 .deal-filter-select { height: 44px; padding: 0 12px; border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; background: var(--bg-primary) !important; color: var(--text-primary); font-size: 13px; cursor: pointer; }
-.deals-toolbar > div:first-child { flex-basis: 100% !important; display: grid !important; grid-template-columns: minmax(220px, 1.7fr) repeat(5, minmax(120px, 1fr)); gap: 10px !important; }
+.deals-toolbar > div:first-child { flex-basis: 100% !important; display: grid !important; grid-template-columns: minmax(180px, 1.5fr) repeat(6, minmax(105px, 1fr)) !important; gap: 8px !important; }
 .deals-toolbar > div:first-child > div { max-width: none !important; min-width: 0 !important; }
 .deals-toolbar > div:last-child { margin-left: auto; }
 .deal-meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; color: var(--text-muted); font-size: 10px; }
