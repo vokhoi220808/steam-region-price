@@ -1,321 +1,243 @@
 <div align="center">
 
-<img src="public/logo.jpg" alt="Steam Region Price Comparator" width="120" style="border-radius:16px" />
+<img src="public/logo.jpg" alt="Steam Region Price Comparator" width="120" style="border-radius:18px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);" />
 
 # Steam Region Price Comparator
 
-**Compare Steam game prices across 27 regions worldwide.**
+**Comprehensive Steam Game Regional Price Comparator, Target Tracker & Personalized Deals Platform.**
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Express](https://img.shields.io/badge/Express-5.1-000000?logo=express)](https://expressjs.com)
+[![Express](https://img.shields.io/badge/Express-5.1-000000?logo=express&logoColor=white)](https://expressjs.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![PWA Ready](https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa&logoColor=white)](#-pwa--web-push-notifications)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-*[Vietnamese](README.md) · **English***
+*[Tiếng Việt](README.md) · **English***
 
 ---
 
-A web tool for comparing Steam game prices across **27 regions**, converting them into a common currency using real-time exchange rates, and tracking games against target prices. All user data is stored locally in the browser—no account required and nothing is sent to an external server.
+An advanced open-source web application designed to compare Steam game prices across **27 countries and regions** with real-time currency conversions, Steam OpenID Cloud Sync, browser Web Push Notifications, internal price snapshots, and sale cycle prediction algorithms.
 
-[Try it live](https://steam-region-price.onrender.com) · [Report a bug](https://github.com/vokhoi220808/steam-region-price/issues) · [Request a feature](https://github.com/vokhoi220808/steam-region-price/issues)
+[🚀 Try Live Demo](https://steam-region-price.onrender.com) · [🐛 Report Bug](https://github.com/vokhoi220808/steam-region-price/issues) · [💡 Request Feature](https://github.com/vokhoi220808/steam-region-price/issues)
 
 </div>
 
 ---
 
-## Table of Contents
+## 📋 Table of Contents
 
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [Installation and Usage](#installation-and-usage)
-- [Project Structure](#project-structure)
-- [API and Caching](#api-and-caching)
-- [Security and Storage](#security-and-storage)
-- [Notes](#notes)
-
----
-
-## Features
-
-### 🔍 Regional Price Comparison
-
-- Search for games, DLC, and Complete Bundles by **name, App/Package ID, or Steam URL**, with autocomplete support
-- Compare prices across **27 regions**: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, and AE
-- Automatically convert prices using **real-time exchange rates**, cached for six hours
-- Three display modes: **Table**, **Grid**, and **Bar Chart**
-- Sort results, filter regions, show or hide unavailable prices, and display discounted games only
-- **Export to CSV**, view 3/6/12-month history charts and historical-low markers through the IsThereAnyDeal API, and copy a shareable link
-
-### 🏷️ Top Deals
-
-- Featured games from Steam APIs, including Specials, Deep Discounts, Free Games, Top Sellers, and New Releases
-- Official Valve Steam Sale/Festival calendar with live countdowns
-- Grid and list views with discount, review, genre, CCU, and content-type filters
-- Open any deal directly in the regional price comparison page
-
-### 📊 Price Tracker
-
-- Add games by name, App ID, or URL through a two-step flow
-- Set a **target price** in a currency of your choice
-- Configure a **preferred region** and multiple **comparison regions** for each game
-- Add **tags**, **custom collections**, **notes**, and pin important games
-- Statuses include: Target Reached, Near Target, Tracking, No Target, and Error
-- Price trends: Increased, Decreased, or Unchanged
-- A visual **price scale** for comparing regional prices
-- A **summary strip** for quickly filtering by status
-- A complete **toolbar** with search, status/region/tag/price filters, ten sorting modes, grid/list switching, and density controls
-- A **detail drawer** with Overview, Regional Prices, Local History, and Storage Information tabs
-- **Bulk price updates** using three parallel workers
-- Public Wishlist sync via Steam ID or profile link (requires `STEAM_API_KEY`)
-
-### 💾 Data Management
-
-- **Import and export JSON** using merge, update, or replace modes
-- **Export CSV** for the tracked game list
-- Automatic **backup and restore** before every write
-- **Schema versioning** with migration support from v0 to v1
-- **Validation** and **salvage/recovery** for corrupted data
-- **Atomic LocalStorage writes** using a temporary key and verification before committing
-- Configurable history limits of 90, 180, or 366 records
-
-### 🎨 Interface
-
-- **Dark and light themes** powered by CSS custom properties
-- Fully **responsive**, including mobile bottom sheets and a hamburger menu
-- **Accessible**, with ARIA roles, focus traps, keyboard navigation, and screen-reader labels
-- Skeleton loading, progress indicators, and complete error and empty states
-- **Internationalization** for Vietnamese and English
+- [Core Features](#-core-features)
+- [Architecture & Tech Stack](#-architecture--tech-stack)
+- [Environment Variables (.env)](#-environment-variables-env)
+- [Database Setup (Supabase)](#-database-setup-supabase)
+- [Installation & Local Run](#-installation--local-run)
+- [System API Endpoints](#-system-api-endpoints)
+- [Deployment Guide](#-deployment-guide)
+- [Disclaimer & License](#-disclaimer--license)
 
 ---
 
-## Technology Stack
+## ✨ Core Features
+
+### 🔑 1. Steam Authentication & Cloud Sync
+- **Steam OpenID Auth**: Secure passwordless authentication creating a personal cloud profile without storing credentials.
+- **Automated Wishlist Import**: Automatically imports and syncs your complete Steam Wishlist upon login.
+- **Cross-Device Sync**: Tracked games, target prices, and alert destinations (Email, Discord, Telegram, Web Push) are preserved when changing devices or clearing browser cache.
+
+### ✨ 2. Personalized Deals ("Deals For You")
+- **Intelligent Scoring Algorithm**:
+  - 🎮 **Steam Wishlist Games**: `+120 priority points`.
+  - 📌 **Tracked Games**: `+90 priority points`.
+  - 🎯 **Near Target Price (`currentPrice <= 1.15 * targetPrice`)**: `+80 priority points`.
+  - 🧩 **Relevant DLCs / Bundles**: `+70 priority points`.
+- **Multi-Dimensional Filters**: Filter by **Maximum Budget (Budget filter)**, discount percentage, user rating, game genre, and content type (Base Game / DLC).
+
+### 📲 3. PWA & Web Push Notifications
+- **Installable Native PWA**: Install the web app directly onto your mobile home screen or desktop with 1 click.
+- **Offline Mode**: Service Worker (`sw.js`) caches static assets and previously viewed Tracker data for offline access.
+- **Native Browser Web Push**: Receive real-time push notifications when games reach target prices without requiring third-party messaging apps.
+
+### 📈 4. Internal Price History & Sale Prediction
+- **Supabase Price Snapshots**: Stores regional price history snapshots in an isolated database.
+- **90-Day Average Comparison Badge**: Highlights the percentage deviation between current price and 90-day average (`versusAverage90Percent`).
+- **Sale Cycle Estimation**: Analyzes historical sale frequency to predict the probability of future discounts.
+
+### 🛡️ 5. Reliability & Admin Dashboard
+- **System Health Monitor**: Real-time status and latency measurement (ms) for **Steam API**, **Supabase**, **Web Push**, and **Email**.
+- **Cron Runs & Retry Queue**: Tracks cron execution metrics, failed notification attempts, and automated retries using exponential backoff.
+- **Rate Limiting & Redis Cache**: Integrates Upstash Redis with in-memory fallback to prevent API rate limits and maximize response speed.
+
+### 🌏 6. 27-Region Price Comparison
+- Fast lookup by Name, App ID, Package ID, or Steam URL.
+- Supports 27 regions: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, AE.
+- Real-time exchange rate conversion to any currency.
+
+---
+
+## 🏗️ Architecture & Tech Stack
+
+```mermaid
+graph TD
+    User[User / PWA Client] -->|HTTP / ServiceWorker| Express[Express 5.1 Backend]
+    Express -->|OpenID Auth| SteamAuth[Steam OpenID Login]
+    Express -->|Fetch Prices| SteamAPI[Steam Store API]
+    Express -->|Exchange Rates| FX[Open Exchange Rates API]
+    Express -->|Snapshot & Sync| Supabase[(Supabase PostgreSQL)]
+    Express -->|Distributed Cache| Redis[(Upstash Redis)]
+    Express -->|Push Notifications| WebPush[Web Push / VAPID]
+    Express -->|Alert Channels| Webhooks[Discord / Telegram / Email]
+```
+
+### Tech Stack Summary
 
 | Layer | Technology |
 |---|---|
-| **Backend** | Node.js 18+, Express 5.1, ES Modules |
-| **Frontend** | Vanilla JavaScript and native ES Modules, with no framework |
-| **Styling** | Pure CSS, approximately 4,200 lines, using CSS custom properties |
-| **Charts** | Chart.js through a CDN |
-| **Fonts** | Inter from Google Fonts |
-| **APIs** | Steam Store API, Open Exchange Rates, and IsThereAnyDeal |
-
-There is **no build step**. The application runs directly in the browser without Webpack, Vite, or Rollup.
+| **Backend Core** | Node.js (v18+), Express 5.1, ES Modules |
+| **Database & Cloud** | Supabase (PostgreSQL), Cloud Alerts Engine |
+| **Caching & Rate Limit** | Upstash Redis REST API / In-memory Map fallback |
+| **Frontend UI** | Vanilla JS, Modular ES Modules, Custom Design System CSS (~4,500 lines) |
+| **PWA & Offline** | Service Worker V7, Web App Manifest, Cache API |
+| **Testing** | Native Node Test Runner (`node --test`) |
 
 ---
 
-## Installation and Usage
+## 📂 Project Structure
 
-### Requirements
-
-- **Node.js 18** or later
-
-### Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/vokhoi220808/steam-region-price.git
-cd steam-region-price
-
-# Install dependencies
-npm install
-
-# Start the development server with automatic reload
-npm run dev
-
-# Or start the production server
-npm start
+```text
+steam-region-price/
+├── api/                  # Vercel Serverless entrypoints
+├── public/               # Frontend Assets & Client Code
+│   ├── modules/          # Client ES Modules (account, tracker, storage, services)
+│   ├── app.js            # Main application controller
+│   ├── index.html        # Main HTML layout
+│   ├── style.css         # Application Design System CSS
+│   ├── tracker.css       # Price Tracker styling
+│   ├── sw.js             # PWA Service Worker & Push Notification Listener
+│   └── manifest.webmanifest # PWA Manifest setup
+├── server/               # Backend Server Modules
+│   ├── account.js        # Steam Auth & Account Sync Router
+│   ├── cloud-alerts.js   # Cloud Price Alert Engine & Dispatchers
+│   ├── history-store.js  # Price Snapshots & Sale Prediction Engine
+│   ├── push.js           # Web Push VAPID Notification Manager
+│   └── reliability.js    # Health Monitor, Rate Limiting & Admin Status Router
+├── supabase/             # Database Migrations SQL
+│   └── migrations/
+│       ├── 001_cloud_price_alerts.sql
+│       └── 002_accounts_pwa_history_reliability.sql
+├── test/                 # Test Suite (node --test)
+├── server.js             # Express Server Main Entry point
+├── package.json          # Node dependencies & scripts
+├── DISCLAIMER.md         # Legal disclaimer
+└── README_EN.md          # Project documentation (English)
 ```
 
-Open **http://localhost:3000** in your browser.
+---
 
-### Environment Variables
+## ⚙️ Environment Variables (.env)
 
-Create a `.env` file in the project root. Do not commit this file to Git.
+Create a `.env` file in the root directory with the following template:
 
 ```env
 PORT=3000
-ITAD_API_KEY=your_api_key_here
-STEAM_API_KEY=your_steam_web_api_key_here
+PUBLIC_BASE_URL=http://localhost:3000
+SESSION_SECRET=your_super_secret_session_key_min_32_chars
+ADMIN_STEAM_IDS=76561198000000000
+
+# Steam API Key
+STEAM_API_KEY=your_steam_api_key
+
+# Supabase Cloud Database (Required for Cloud Sync & Alerts)
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-CRON_SECRET=your_long_random_secret
-ALERT_BATCH_SIZE=80
-TELEGRAM_BOT_TOKEN=your_bot_token
-RESEND_API_KEY=re_xxxxxxxxx
-ALERT_FROM_EMAIL=Steam Price Compare <alerts@your-domain.com>
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Web Push VAPID Keys
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_SUBJECT=mailto:admin@example.com
+
+# Redis Caching (Optional)
+UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
+
+# Email Alerts (Resend - Optional)
+RESEND_API_KEY=re_your_resend_api_key
+ALERT_FROM_EMAIL=alerts@yourdomain.com
+
+# Cron Job Protection
+CRON_SECRET=your_cron_secret_token
 ```
 
-| Variable | Default | Required | Description |
-|---|---|---|---|
-| `PORT` | `3000` | No | Server port |
-| `ITAD_API_KEY` | — | No | API key from [IsThereAnyDeal](https://isthereanydeal.com/dev/key/), required for price history |
-| `STEAM_API_KEY` | — | No | Steam Web API key, required to sync a public Wishlist from a Steam ID/Profile Link |
-| `SUPABASE_URL` | — | Cloud Alerts | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | — | Cloud Alerts | Service role key; keep it in backend/Vercel environment variables only |
-| `CRON_SECRET` | — | Cloud Alerts | Secret protecting the cron endpoint |
-| `ALERT_BATCH_SIZE` | `80` | No | Maximum alerts processed per run, hard-capped at 500 |
-| `TELEGRAM_BOT_TOKEN` | — | Telegram | Shared Telegram bot token |
-| `RESEND_API_KEY` | — | Email | Resend API key |
-| `ALERT_FROM_EMAIL` | — | Email | Sender on a verified domain |
+---
 
-> **Note:** The application still works without either API key. `ITAD_API_KEY` enables real price history; `STEAM_API_KEY` enables Wishlist sync.
+## 🗄️ Database Setup (Supabase)
 
-### Cloud Price Alerts on Vercel
+To enable Cloud Sync, Internal Price History, and the Reliability Dashboard, execute the SQL migration scripts in `supabase/migrations/` using the **SQL Editor** in your Supabase dashboard:
 
-1. Create a Supabase project and run `supabase/migrations/001_cloud_price_alerts.sql` in its SQL Editor.
-2. Add the environment variables above to Vercel. Never expose the service role key to frontend code.
-3. Deploy. `vercel.json` invokes `/api/cron/check-alerts` daily at 02:00 UTC, which is suitable for Vercel Hobby.
-4. For six-hour checks, use Supabase Cron to call the same endpoint with `Authorization: Bearer <CRON_SECRET>`, or adjust the schedule on an appropriate Vercel plan.
-5. Open **Price Tracker → Price Alerts**, configure at least one channel, then select **Save & sync**.
+1. `001_cloud_price_alerts.sql`: Sets up price alert clients, alerts, and event logs.
+2. `002_accounts_pwa_history_reliability.sql`: Sets up `user_accounts`, `cloud_tracker`, `user_wishlist`, `push_subscriptions`, `price_snapshots`, `cron_runs`, `retry_jobs`, and `service_health` tables.
 
-Discord only needs a Webhook URL. Telegram requires `TELEGRAM_BOT_TOKEN` plus the recipient Chat ID. Email requires Resend and a verified sender domain. Each cron invocation handles 80 alerts by default with four concurrent price requests and repeats an alert only after a 24-hour cooldown when the price drops further.
+---
 
-### Testing
+## 🛠️ Installation & Local Run
 
+### 1. Clone Repository & Install Dependencies
 ```bash
-npm test
+git clone https://github.com/vokhoi220808/steam-region-price.git
+cd steam-region-price
+npm install
 ```
 
-### Scripts
+### 2. Run Development Server
+```bash
+npm run dev
+```
+The application will be accessible at: `http://localhost:3000`
 
-| Script | Description |
-|---|---|
-| `npm start` | Start the production server |
-| `npm run dev` | Start the development server with file watching using `node --watch` |
-| `npm test` | Run all tests using Node.js's built-in test runner |
-
----
-
-## Project Structure
-
-```text
-steam-region-price-comparator/
-├── server.js                    # Express server — API proxy and caching
-├── package.json
-├── public/
-│   ├── index.html               # Single-page application, 657 lines
-│   ├── app.js                   # Main controller, 2,062 lines
-│   ├── style.css                # Theme and layout, 1,094 lines
-│   ├── tracker.css              # Price tracker styles, 3,077 lines
-│   ├── logo.jpg
-│   └── modules/
-│       ├── components/          # UI components
-│       │   ├── game-card.js         # Game card for grid view
-│       │   ├── game-row.js          # Game row for list view
-│       │   ├── game-drawer.js       # Detail drawer with tabs
-│       │   ├── game-sheet.js        # Add/edit game sheet
-│       │   ├── price-scale.js       # Visual price scale
-│       │   ├── summary-strip.js     # Status summary and quick filters
-│       │   ├── tracker-toolbar.js   # Filter and sorting toolbar
-│       │   ├── data-manager.js      # Import/export/backup dialog
-│       │   ├── confirm-dialog.js    # Accessible confirmation dialog
-│       │   └── empty-state.js       # Empty and no-results states
-│       ├── services/            # API layer
-│       │   ├── steam-service.js     # Steam API client
-│       │   └── history-simulation.js # Simulated price history
-│       ├── storage/             # LocalStorage persistence
-│       │   ├── storage-schema.js        # Data schema and defaults
-│       │   ├── storage-validation.js    # Validation and sanitization
-│       │   ├── storage-migrations.js    # Schema migration system
-│       │   ├── storage-repository.js    # Full CRUD repository
-│       │   └── storage-import-export.js # JSON/CSV import and export
-│       ├── tracker/             # Tracker feature logic
-│       │   ├── tracker-store.js     # Reactive publish/subscribe store
-│       │   ├── tracker-status.js    # Status calculation
-│       │   ├── tracker-filters.js   # Filtering and sorting logic
-│       │   └── tracker-page.js      # Page orchestrator
-│       └── utils/               # Shared utilities
-│           ├── currency.js      # Currency formatting
-│           ├── dates.js         # Date formatting
-│           ├── debounce.js      # Debounce and throttle helpers
-│           ├── dom.js           # DOM helpers, focus trap, and XSS protection
-│           └── ids.js           # UUID generation
-└── test/                        # Tests using Node.js's built-in runner
-    ├── history-simulation.test.js
-    ├── price-scale.test.js
-    ├── storage-repository.test.js
-    ├── tracker-filters.test.js
-    └── tracker-markup.test.js
+### 3. Run Automated Tests
+```bash
+node --test
 ```
 
-The project contains approximately **7,800 lines of source code**, excluding `node_modules`.
-
 ---
 
-## API and Caching
+## 📡 System API Endpoints
 
-### Backend Routes
-
-| Route | Description |
-|---|---|
-| `GET /api/regions` | Return the 27 supported regions, including code, name, and flag |
-| `GET /api/search?q=...` | Search for games through the Steam Store Search API |
-| `GET /api/compare/:appId?currency=VND&regions=vn,us,...` | Fetch regional prices, convert currencies, and rank the results |
-| `GET /api/history/:appId` | Fetch price history from the IsThereAnyDeal API |
-| `GET /api/deals?cc=VN` | Fetch featured games from the Steam Featured Categories API |
-| `GET /api/deals/metadata?appids=...` | Fetch reviews, genres, and CCU for advanced filters |
-| `GET /api/sales-calendar` | Return upcoming Steam Sale/Festival events |
-| `GET /api/wishlist?profile=...` | Sync a public Steam Wishlist |
-| `GET /api/cache/status` | Return cache hit/miss and capacity statistics |
-| `GET /api/alerts/status` | Return Cloud Alerts readiness and available channels |
-| `POST /api/alerts/sync` | Sync games with target prices to Supabase |
-| `POST /api/alerts/test` | Send a test through the saved channels |
-| `DELETE /api/alerts` | Disable all alerts for the current device |
-| `GET /api/cron/check-alerts` | `CRON_SECRET`-protected price check and notification job |
-
-### API Keys
-
-| API | Authentication | Notes |
+| Endpoint | Method | Description |
 |---|---|---|
-| **Steam Store API** | No key required | Free to access, with rate limits |
-| **Open Exchange Rates** | No key required | Free tier, cached for six hours |
-| **IsThereAnyDeal** | API key required | Free registration at [isthereanydeal.com/dev/key](https://isthereanydeal.com/dev/key/) |
-| **Steam Web API** | API key required for Wishlist | Register at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) |
-
-> **Why is a CORS proxy required?** Steam's API does not support browser CORS requests, so all frontend requests are sent through the backend server.
-
-### Caching Strategy
-
-| Data | TTL | Storage |
-|---|---|---|
-| Game prices | 20 minutes | In-memory `Map` |
-| Exchange rates | 6 hours | In-memory `Map` |
-| Deals / CCU | 5 minutes | In-memory `Map` |
-| Metadata | 6 hours | In-memory `Map` |
-
-The server acts as a **CORS proxy**, routing requests to Steam APIs to avoid browser restrictions.
+| `/api/auth/steam` | `GET` | Initiates Steam OpenID authentication redirect |
+| `/api/auth/me` | `GET` | Returns current user authentication state |
+| `/api/account/data` | `GET` | Fetches user cloud tracker & wishlist data |
+| `/api/account/sync` | `POST` | Syncs local tracker data to cloud |
+| `/api/account/wishlist/sync` | `POST` | Triggers automated Steam Wishlist import |
+| `/api/account/deals` | `GET` | Fetches personalized deals based on Wishlist & Tracker |
+| `/api/deals` | `GET` | Fetches top regional deals (supports maxPrice budget filter) |
+| `/api/history/internal/:appId` | `GET` | Fetches price history snapshots & sale predictions |
+| `/api/push/subscribe` | `POST` | Registers browser Web Push subscription |
+| `/api/health` | `GET` | Performs system service health check |
+| `/api/admin/status` | `GET` | Admin dashboard analytics & metrics |
+| `/api/cron/check-alerts` | `GET/POST` | Automated cron endpoint for checking prices & sending alerts |
 
 ---
 
-## Security and Storage
+## 🚀 Deployment Guide
 
-- **No registration required** — no personal information is collected
-- **Local-only data** — tracker data is stored in LocalStorage and is not sent to the server
-- **No background processing** — prices are updated only when the user manually selects “Update prices”
-- **XSS protection** — all input data is processed through `escapeHtml()` before being inserted into the DOM
-- **Atomic writes** — data is written to a temporary key, validated, and then committed
-- **Automatic backups** — the previous data state is saved before each write
-- **Schema versioning** — migrations are supported when the data schema changes
+### Deploy on Render / Railway / Custom VPS
+1. Connect your GitHub repository to your Cloud Host.
+2. Set **Build Command**: `npm install`
+3. Set **Start Command**: `npm start`
+4. Add all environment variables from `.env`.
 
----
-
-## Notes
-
-- Steam's Storefront API may change or restrict access at any time.
-- Exchange rates are fetched from `open.er-api.com` and cached for six hours.
-- Steam prices are cached for 20 minutes to reduce the number of requests.
-- Tracker history contains only price changes saved on the current device. It is **not official Steam price history**.
-- This tool is for reference only and **does not support changing the region of a Steam account**.
+### Automated Cron Setup
+Configure an external cron service (every 15-30 minutes) to invoke:
+```http
+POST https://your-domain.com/api/cron/check-alerts
+Authorization: Bearer YOUR_CRON_SECRET
+```
 
 ---
 
-<div align="center">
+## 📜 Disclaimer & License
 
-Made with ❤️ for the Steam community
-## License
+Please review our legal disclosure in [DISCLAIMER.md](DISCLAIMER.md).
 
-Licensed under the [MIT License](LICENSE).
-
-This is an unofficial project and is not affiliated with Valve or Steam.
-See [DISCLAIMER.md](DISCLAIMER.md) for additional information.
-</div>
+Released under the [MIT License](LICENSE). Copyright (c) 2026.
