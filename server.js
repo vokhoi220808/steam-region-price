@@ -14,7 +14,7 @@ import {
 } from "./server/cloud-alerts.js";
 import { attachAccountSession, createAccountRouter } from "./server/account.js";
 import { createPushRouter, sendUserPush } from "./server/push.js";
-import { getInternalHistory, getPublisherSaleHeatmap, getPurchaseAdvice, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
+import { getInternalHistory, getPurchaseAdvice, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
 import { createReliabilityRouter, distributedCacheGet, distributedCacheSet, finishCronRun, rateLimit, startCronRun, updateServiceHealth } from "./server/reliability.js";
 
 const app = express();
@@ -851,10 +851,6 @@ async function handleCloudAlertCron(req, res) {
     res.status(500).json({ error: "Không thể hoàn tất lượt kiểm tra giá." });
   }
 }
-
-app.get('/api/publishers/heatmap', (_req, res) => {
-  res.json({ publishers: getPublisherSaleHeatmap() });
-});
 
 app.get('/api/purchase-advice/:appId', async (req, res, next) => {
   try {

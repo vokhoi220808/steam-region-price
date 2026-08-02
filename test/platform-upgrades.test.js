@@ -16,11 +16,9 @@ test("account, personalized deals and internal history entry points are present"
   assert.match(html, /id="dealBudgetFilter"/);
   assert.match(html, /data-history-source="internal"/);
   assert.match(html, /id="themeToggleBtn"/);
-  assert.match(html, /id="publisherHeatmapGrid"/);
   assert.match(client, /\/api\/account\/sync/);
   assert.match(server, /\/api\/account\/deals/);
   assert.match(server, /Gần đạt giá mục tiêu/);
-  assert.match(server, /\/api\/publishers\/heatmap/);
   assert.match(server, /\/api\/cron\/weekly-digest/);
   assert.match(account, /getWishlist\(match\[1\]\)/);
   assert.match(server, /\/api\/history\/internal\/\:appId/);

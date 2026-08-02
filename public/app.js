@@ -465,71 +465,6 @@ function initThemeToggle() {
   });
 }
 
-const defaultPublisherData = [
-  { id: "capcom", name: "Capcom", avgDiscount: 67, peakMonths: ["Tháng 3", "Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Spring Sale, Golden Week, Autumn Fest, Winter Sale", recommendation: "Hay có đợt Publisher Sale bất ngờ, đợt giảm sâu nhất thường vào Winter Sale." },
-  { id: "ea", name: "Electronic Arts (EA)", avgDiscount: 70, peakMonths: ["Tháng 5", "Tháng 8", "Tháng 11", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Publisher Weekend, Autumn Sale, Winter Sale", recommendation: "Game ra mắt sau 6-9 tháng thường có mức giảm 50-60%." },
-  { id: "bandai_namco", name: "Bandai Namco", avgDiscount: 65, peakMonths: ["Tháng 4", "Tháng 9", "Tháng 11", "Tháng 12"], frequency: "Thường xuyên", pattern: "Anime Month, Summer Sale, Black Friday, Winter Sale", recommendation: "DLC và Season Pass thường giảm mạnh sau 1 năm." },
-  { id: "ubisoft", name: "Ubisoft", avgDiscount: 75, peakMonths: ["Tháng 3", "Tháng 7", "Tháng 11", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Spring Sale, Summer Spotlight, Black Friday, Winter Sale", recommendation: "Các tựa game Franchise cũ thường xuyên chạm mốc giảm 75-80%." },
-  { id: "sony", name: "Sony Interactive (PlayStation)", avgDiscount: 50, peakMonths: ["Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Trung bình", pattern: "Days of Play, Autumn Sale, Winter Sale", recommendation: "Game PlayStation PC hiếm khi giảm quá 50% trong năm đầu tiên." },
-  { id: "xbox", name: "Xbox Game Studios", avgDiscount: 60, peakMonths: ["Tháng 6", "Tháng 11", "Tháng 12"], frequency: "Thường xuyên", pattern: "Xbox Showcase, Summer Sale, Winter Sale", recommendation: "Thường giảm sâu vào các đợt Showcase tháng 6." },
-  { id: "sega", name: "SEGA", avgDiscount: 65, peakMonths: ["Tháng 5", "Tháng 10", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Sonic Fest, Halloween, Winter Sale", recommendation: "Chu kỳ sale lặp lại định kỳ mỗi 2-3 tháng." },
-  { id: "cdpr", name: "CD PROJEKT RED", avgDiscount: 60, peakMonths: ["Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Trung bình", pattern: "Cyberpunk Fest, Summer Sale, Winter Sale", recommendation: "Mức giảm đỉnh điểm 75-85% cho The Witcher và 50-60% cho Cyberpunk 2077." }
-];
-
-function renderPublisherCards(publishers) {
-  const grid = document.getElementById("publisherHeatmapGrid");
-  if (!grid) return;
-  grid.innerHTML = (publishers || []).map((pub) => {
-    const adviceClass = pub.avgDiscount >= 70 ? "advice-buy-now" : pub.avgDiscount >= 60 ? "advice-good-deal" : "advice-wait";
-    const adviceText = pub.avgDiscount >= 70 ? "🔥 NÊN MUA NGAY" : pub.avgDiscount >= 60 ? "✅ MỨC GIÁ TỐT" : "⏳ NÊN ĐỢI SALE LỚN";
-    return `
-      <div class="publisher-card">
-        <div class="publisher-card-head">
-          <h4>${pub.name}</h4>
-          <span class="publisher-badge">-${pub.avgDiscount}% TB</span>
-        </div>
-        <p><strong>Tần suất:</strong> ${pub.frequency}</p>
-        <p><strong>Chu kỳ Sale:</strong> ${pub.pattern}</p>
-        <p style="margin-top: 6px; font-style: italic; color: var(--text-muted);">${pub.recommendation}</p>
-        <div class="purchase-advice-badge ${adviceClass}">
-          ${adviceText}
-        </div>
-        <div class="publisher-tags">
-          ${(pub.peakMonths || []).map((m) => `<span class="publisher-tag">🔥 ${m}</span>`).join("")}
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-function initPublisherHeatmapToggle() {
-  const header = document.getElementById("togglePublisherHeatmapHeader");
-  const grid = document.getElementById("publisherHeatmapGrid");
-  const btn = document.getElementById("togglePublisherHeatmapBtn");
-  const badge = document.getElementById("publisherHeatmapToggleBadge");
-  if (!header || !grid) return;
-
-  header.addEventListener("click", () => {
-    const isHidden = grid.classList.toggle("hidden");
-    if (btn) btn.textContent = isHidden ? "Xem 8 NPH ▾" : "Thu gọn ▴";
-    if (badge) badge.textContent = isHidden ? "Click để xem ▾" : "Thu gọn ▴";
-  });
-}
-
-async function fetchPublisherHeatmap() {
-  initPublisherHeatmapToggle();
-  renderPublisherCards(defaultPublisherData);
-  try {
-    const res = await fetch("/api/publishers/heatmap");
-    const data = await res.json().catch(() => ({}));
-    if (data.publishers && data.publishers.length) {
-      renderPublisherCards(data.publishers);
-    }
-  } catch (error) {
-    console.error("Heatmap Fetch Error:", error);
-  }
-}
-
 function setupHotkeyListeners() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey && e.key.toLowerCase() === "k") || (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName))) {
@@ -551,7 +486,6 @@ async function init() {
   setupDealsEvents();
   renderRegions();
   setupCurrencyDropdown();
-  fetchPublisherHeatmap();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
