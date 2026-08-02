@@ -216,10 +216,13 @@ export function createAccountRouter() {
   const router = express.Router();
 
   router.get("/auth/steam", (req, res) => {
-    if (!config().sessionSecret || !cloudDatabaseConfigured()) return res.status(503).send("Steam Cloud Sync chưa được cấu hình.");
-    const state = randomBytes(24).toString("base64url");
-    res.cookie(STATE_COOKIE, signedToken({ state, exp: Date.now() + 10 * 60 * 1000 }), cookieOptions(req, 600));
-    const returnTo = `${baseUrl(req)}/api/auth/steam/callback?state=${encodeURIComponent(state)}`;
+    if (!config().sessionSecret || !cloudDatabaseConfigured()) {
+      return res.redirect(`/?login=error&message=${encodeURIComponent("Máy chủ chưa cấu hình SESSION_SECRET hoặc Supabase Database.")}`);
+    }
+    const nonce = randomBytes(16).toString("hex");
+    const stateToken = signedToken({ nonce, exp: Date.now() + 10 * 60 * 1000 });
+    res.cookie(STATE_COOKIE, stateToken, cookieOptions(req, 600));
+    const returnTo = `${baseUrl(req)}/api/auth/steam/callback?state=${encodeURIComponent(stateToken)}`;
     const query = new URLSearchParams({
       "openid.ns": "http://specs.openid.net/auth/2.0",
       "openid.mode": "checkid_setup",
@@ -233,18 +236,19 @@ export function createAccountRouter() {
 
   router.get("/auth/steam/callback", async (req, res) => {
     try {
+      const stateFromQuery = verifyToken(req.query.state);
       const stateCookie = verifyToken(parseCookies(req)[STATE_COOKIE]);
-      if (!stateCookie || stateCookie.state !== req.query.state) throw new Error("Phiên đăng nhập đã hết hạn.");
+      if (!stateFromQuery && !stateCookie) throw new Error("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
       const verification = new URLSearchParams();
       for (const [key, value] of Object.entries(req.query)) if (key.startsWith("openid.")) verification.set(key, String(value));
       verification.set("openid.mode", "check_authentication");
       const response = await fetch("https://steamcommunity.com/openid/login", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: verification, signal: AbortSignal.timeout(15000) });
       const result = await response.text();
-      if (!response.ok || !/is_valid\s*:\s*true/i.test(result)) throw new Error("Steam không xác thực được đăng nhập.");
+      if (!response.ok || !/is_valid\s*:\s*true/i.test(result)) throw new Error("Steam không xác thực được thông tin đăng nhập.");
       const match = String(req.query["openid.claimed_id"] || "").match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/);
       if (!match) throw new Error("Steam ID không hợp lệ.");
       const account = await upsertAccount(match[1]);
-      if (!account) throw new Error("Không thể tạo tài khoản cloud.");
+      if (!account) throw new Error("Không thể tạo tài khoản cloud trên database.");
       getWishlist(match[1]).then(async (wishlist) => {
         if (wishlist?.length) {
           await supabaseRequest("user_wishlist?on_conflict=user_id,app_id", {
