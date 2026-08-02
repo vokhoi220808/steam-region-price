@@ -1,13 +1,16 @@
 {
   "name": "Steam Price Compare",
   "short_name": "Steam Prices",
-  "description": "Theo dõi và so sánh giá Steam theo khu vực.",
+  "description": "Nền tảng theo dõi, so sánh giá game Steam 27 khu vực & deal cá nhân hóa.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#070b12",
   "theme_color": "#0b1320",
+  "categories": ["utilities", "entertainment", "shopping"],
   "icons": [
-    { "src": "/logo.jpg", "sizes": "any", "type": "image/jpeg", "purpose": "any" }
+    { "src": "/logo.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any maskable" },
+    { "src": "/logo.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any maskable" }
   ]
 }

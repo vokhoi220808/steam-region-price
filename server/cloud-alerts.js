@@ -467,3 +467,50 @@ export async function runRetryQueue({ sendPush } = {}) {
   }
   return summary;
 }
+
+export async function runWeeklyEmailDigest({ getQuote } = {}) {
+  if (!cloudDatabaseConfigured()) return { processed: 0, sent: 0, failed: 0 };
+  const accounts = await supabaseRequest("user_accounts?email=not.is.null&select=id,email,display_name&limit=200");
+  const summary = { processed: (accounts || []).length, sent: 0, failed: 0 };
+
+  for (const account of accounts || []) {
+    if (!account.email) continue;
+    try {
+      const [tracker, wishlist] = await Promise.all([
+        supabaseRequest(`cloud_tracker?user_id=eq.${account.id}&select=*`),
+        supabaseRequest(`user_wishlist?user_id=eq.${account.id}&select=app_id,metadata`)
+      ]);
+      const deals = [];
+      for (const row of tracker || []) {
+        const quote = typeof getQuote === "function" ? await getQuote({ app_id: row.app_id, product_type: row.product_type, region_code: row.region_code || "vn", target_currency: row.target_currency || "VND" }).catch(() => null) : null;
+        if (quote?.available && quote.discountPercent >= 20) {
+          deals.push({ name: row.game_data?.name || `App ${row.app_id}`, discount: quote.discountPercent, price: quote.amount, currency: quote.currency || "VND", steamUrl: `https://store.steampowered.com/app/${row.app_id}` });
+        }
+      }
+      for (const row of wishlist || []) {
+        const meta = row.metadata || {};
+        const discount = Number(meta.discount_pct || 0);
+        if (discount >= 20 && !deals.some((d) => d.name === meta.name)) {
+          deals.push({ name: meta.name || `App ${row.app_id}`, discount, price: meta.subs?.[0]?.price || null, currency: "VND", steamUrl: `https://store.steampowered.com/app/${row.app_id}` });
+        }
+      }
+
+      if (deals.length) {
+        const text = `Xin chào ${account.display_name},\n\nDưới đây là tổng hợp ${deals.length} game đang có mức giảm giá tốt nhất tuần này trong Tracker & Wishlist của bạn:\n\n` +
+          deals.slice(0, 10).map((d) => `• ${d.name}: Giảm ${d.discount}% (${d.steamUrl})`).join("\n") +
+          `\n\nChúc bạn săn deal vui vẻ!\nSteam Price Compare Team`;
+
+        const message = {
+          subject: `🔥 Báo cáo Giá Tuần: ${deals.length} game đang giảm giá tốt nhất cho bạn`,
+          text,
+          steamUrl: "https://store.steampowered.com/"
+        };
+        await sendEmail(account.email, message);
+        summary.sent += 1;
+      }
+    } catch {
+      summary.failed += 1;
+    }
+  }
+  return summary;
+}

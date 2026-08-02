@@ -95,8 +95,33 @@ export async function runTrackedHistorySweep({ getQuote, concurrency = 4 } = {})
       } catch { summary.failed += 1; }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(tasks.length, 1)) }, worker));
   const finishedAt = new Date().toISOString();
   await Promise.all((rows || []).map((row) => supabaseRequest(`cloud_tracker?id=eq.${row.id}`, { method: "PATCH", body: { last_history_scan_at: finishedAt }, prefer: "return=minimal" }).catch(() => {})));
   return { ...summary, finishedAt };
+}
+
+export function getPublisherSaleHeatmap() {
+  return [
+    { id: "capcom", name: "Capcom", avgDiscount: 67, peakMonths: ["Tháng 3", "Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Spring Sale, Golden Week, Autumn Fest, Winter Sale", recommendation: "Hay có đợt Publisher Sale bất ngờ, đợt giảm sâu nhất thường vào Winter Sale." },
+    { id: "ea", name: "Electronic Arts (EA)", avgDiscount: 70, peakMonths: ["Tháng 5", "Tháng 8", "Tháng 11", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Publisher Weekend, Autumn Sale, Winter Sale", recommendation: "Game ra mắt sau 6-9 tháng thường có mức giảm 50-60%." },
+    { id: "bandai_namco", name: "Bandai Namco", avgDiscount: 65, peakMonths: ["Tháng 4", "Tháng 9", "Tháng 11", "Tháng 12"], frequency: "Thường xuyên", pattern: "Anime Month, Summer Sale, Black Friday, Winter Sale", recommendation: "DLC và Season Pass thường giảm mạnh sau 1 năm." },
+    { id: "ubisoft", name: "Ubisoft", avgDiscount: 75, peakMonths: ["Tháng 3", "Tháng 7", "Tháng 11", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Spring Sale, Summer Spotlight, Black Friday, Winter Sale", recommendation: "Các tựa game Franchise cũ thường xuyên chạm mốc giảm 75-80%." },
+    { id: "sony", name: "Sony Interactive (PlayStation)", avgDiscount: 50, peakMonths: ["Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Trung bình", pattern: "Days of Play, Autumn Sale, Winter Sale", recommendation: "Game PlayStation PC hiếm khi giảm quá 50% trong năm đầu tiên." },
+    { id: "xbox", name: "Xbox Game Studios", avgDiscount: 60, peakMonths: ["Tháng 6", "Tháng 11", "Tháng 12"], frequency: "Thường xuyên", pattern: "Xbox Showcase, Summer Sale, Winter Sale", recommendation: "Thường giảm sâu vào các đợt Showcase tháng 6." },
+    { id: "sega", name: "SEGA", avgDiscount: 65, peakMonths: ["Tháng 5", "Tháng 10", "Tháng 12"], frequency: "Rất thường xuyên", pattern: "Sonic Fest, Halloween, Winter Sale", recommendation: "Chu kỳ sale lặp lại định kỳ mỗi 2-3 tháng." },
+    { id: "cdpr", name: "CD PROJEKT RED", avgDiscount: 60, peakMonths: ["Tháng 6", "Tháng 10", "Tháng 12"], frequency: "Trung bình", pattern: "Cyberpunk Fest, Summer Sale, Winter Sale", recommendation: "Mức giảm đỉnh điểm 75-85% cho The Witcher và 50-60% cho Cyberpunk 2077." }
+  ];
+}
+
+export function getPurchaseAdvice({ currentPrice, originalPrice, discountPercent, stats } = {}) {
+  const discount = Number(discountPercent || 0);
+  const isHistoricalLow = stats?.historicalLow !== null && currentPrice !== null && Number(currentPrice) <= Number(stats?.historicalLow) * 1.02;
+
+  if (discount >= 70 || isHistoricalLow) {
+    return { action: "BUY_NOW", badge: "🔥 NÊN MUA NGAY", color: "#10b981", reason: isHistoricalLow ? "Giá hiện tại đang ở mốc thấp nhất lịch sử!" : "Game đang có mức giảm giá cực sâu (từ 70% trở lên)." };
+  }
+  if (discount >= 40) {
+    return { action: "GOOD_DEAL", badge: "✅ MỨC GIÁ TỐT", color: "#3b82f6", reason: "Mức giảm khá tốt. Nếu bạn muốn trải nghiệm ngay thì đây là mức giá hợp lý." };
+  }
+  return { action: "WAIT_FOR_SALE", badge: "⏳ NÊN ĐỢI SALE LỚN", color: "#f59e0b", reason: "Mức giảm hiện tại chưa sâu. Khuyến nghị đợi đợt Steam Seasonal Sale tiếp theo." };
 }

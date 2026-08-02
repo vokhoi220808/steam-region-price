@@ -8,12 +8,13 @@ import {
   getCloudAlertCapabilities,
   runCloudAlertChecks,
   runRetryQueue,
+  runWeeklyEmailDigest,
   sendCloudAlertTest,
   syncCloudAlerts
 } from "./server/cloud-alerts.js";
 import { attachAccountSession, createAccountRouter } from "./server/account.js";
 import { createPushRouter, sendUserPush } from "./server/push.js";
-import { getInternalHistory, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
+import { getInternalHistory, getPublisherSaleHeatmap, getPurchaseAdvice, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
 import { createReliabilityRouter, distributedCacheGet, distributedCacheSet, finishCronRun, rateLimit, startCronRun, updateServiceHealth } from "./server/reliability.js";
 
 const app = express();
@@ -851,8 +852,43 @@ async function handleCloudAlertCron(req, res) {
   }
 }
 
-app.get('/api/cron/check-alerts', handleCloudAlertCron);
-app.post('/api/cron/check-alerts', handleCloudAlertCron);
+app.get('/api/publishers/heatmap', (_req, res) => {
+  res.json({ publishers: getPublisherSaleHeatmap() });
+});
+
+app.get('/api/purchase-advice/:appId', async (req, res, next) => {
+  try {
+    const appId = Number(req.params.appId);
+    const history = await getInternalHistory(appId, { days: 365 }).catch(() => null);
+    const advice = getPurchaseAdvice({
+      currentPrice: history?.stats?.current,
+      stats: history?.stats
+    });
+    res.json(advice);
+  } catch (error) { next(error); }
+});
+
+async function handleWeeklyDigestCron(req, res) {
+  const cronSecret = String(process.env.CRON_SECRET || "");
+  const authorization = String(req.get("authorization") || "");
+  const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!cronSecret) return res.status(503).json({ error: "CRON_SECRET chưa được cấu hình." });
+  if (!supplied || !secureStringEqual(supplied, cronSecret)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const runId = await startCronRun("weekly-digest").catch(() => null);
+  try {
+    const summary = await runWeeklyEmailDigest({ getQuote: getCloudAlertQuote });
+    await finishCronRun(runId, summary);
+    res.json(summary);
+  } catch (error) {
+    await finishCronRun(runId, null, error);
+    res.status(500).json({ error: "Không thể gửi weekly email digest." });
+  }
+}
+
+app.get('/api/cron/weekly-digest', handleWeeklyDigestCron);
+app.post('/api/cron/weekly-digest', handleWeeklyDigestCron);
 
 app.use("/api", createReliabilityRouter({ cacheStats, cacheSize: () => cache.size }));
 

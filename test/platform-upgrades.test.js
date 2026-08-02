@@ -15,20 +15,27 @@ test("account, personalized deals and internal history entry points are present"
   assert.match(html, /data-category="personalized"/);
   assert.match(html, /id="dealBudgetFilter"/);
   assert.match(html, /data-history-source="internal"/);
+  assert.match(html, /id="themeToggleBtn"/);
+  assert.match(html, /id="publisherHeatmapGrid"/);
   assert.match(client, /\/api\/account\/sync/);
   assert.match(server, /\/api\/account\/deals/);
   assert.match(server, /Gần đạt giá mục tiêu/);
+  assert.match(server, /\/api\/publishers\/heatmap/);
+  assert.match(server, /\/api\/cron\/weekly-digest/);
   assert.match(account, /getWishlist\(match\[1\]\)/);
   assert.match(server, /\/api\/history\/internal\/\:appId/);
 });
 
-test("PWA shell and push listener are installable", async () => {
-  const [manifest, worker] = await Promise.all([
+test("PWA shell, iOS metadata and push listener are installable", async () => {
+  const [html, manifest, worker] = await Promise.all([
+    readFile(new URL("public/index.html", root), "utf8"),
     readFile(new URL("public/manifest.webmanifest", root), "utf8"),
     readFile(new URL("public/sw.js", root), "utf8")
   ]);
   const parsed = JSON.parse(manifest);
   assert.equal(parsed.display, "standalone");
+  assert.match(html, /apple-touch-icon/);
+  assert.match(html, /apple-mobile-web-app-capable/);
   assert.match(worker, /addEventListener\("push"/);
   assert.match(worker, /addEventListener\("fetch"/);
 });

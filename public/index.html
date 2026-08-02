@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b1320" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Steam Prices" />
+  <link rel="apple-touch-icon" href="/logo.jpg" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <title>So sánh giá game Steam theo từng khu vực</title>
   <meta name="description" content="Steam Price Compare là công cụ giúp bạn kiểm tra và so sánh giá game Steam tại nhiều quốc gia và khu vực khác nhau." />
@@ -46,7 +50,7 @@
           <option value="KR">KR (KRW)</option>
         </select>
         
-        <button class="icon-btn theme-toggle" title="Đổi giao diện" aria-label="Đổi giao diện">
+        <button class="icon-btn theme-toggle" id="themeToggleBtn" title="Đổi giao diện" aria-label="Đổi giao diện">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
         <a href="https://github.com/vokhoi220808/steam-region-price" target="_blank" class="icon-btn" title="GitHub" aria-label="GitHub">
@@ -473,6 +477,18 @@
         </div>
         <div class="sale-calendar-skeleton" id="saleCalendarLoading"><span></span><span></span><span></span></div>
         <div class="sale-calendar-grid hidden" id="saleCalendarGrid"></div>
+      </section>
+
+      <!-- PUBLISHER SALE HEATMAP -->
+      <section class="sale-calendar-card" id="publisherHeatmapSection" style="margin-bottom: 32px;">
+        <div class="sale-calendar-head">
+          <div>
+            <span class="sale-calendar-kicker">PHÂN TÍCH NHÀ PHÁT HÀNH</span>
+            <h3>🔥 Publisher Sale Heatmap & Lời khuyên mua game</h3>
+          </div>
+          <span style="font-size: 13px; color: var(--text-muted);">Chu kỳ sale & khuyến nghị "Có nên mua ngay?"</span>
+        </div>
+        <div class="publisher-heatmap-grid" id="publisherHeatmapGrid"></div>
       </section>
 
       <!-- TABS -->
