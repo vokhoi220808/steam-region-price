@@ -767,22 +767,70 @@
         </div>
         <!-- PC Specs Tab -->
         <div id="pcSpecsTabContent">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-            <select id="userGpuSelect" style="height:36px; padding:0 8px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
-              <option value="rtx4070">RTX 4070 / RX 7800 (Cao)</option>
-              <option value="rtx3060" selected>RTX 3060 / RX 6600 (Tốt)</option>
-              <option value="gtx1650">GTX 1650 / RX 570 (TB)</option>
-              <option value="gtx1050ti">GTX 1050 Ti (Tối thiểu)</option>
-              <option value="igpu">Intel Iris / iGPU (Yếu)</option>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
+            <select id="userGpuSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
+              <optgroup label="🔴 NVIDIA – Cao cấp">
+                <option value="rtx4090">RTX 4090</option>
+                <option value="rtx4080">RTX 4080</option>
+                <option value="rtx4070">RTX 4070 Ti / 4070</option>
+                <option value="rtx4060">RTX 4060 Ti / 4060</option>
+              </optgroup>
+              <optgroup label="🔴 NVIDIA – Tầm trung">
+                <option value="rtx3080">RTX 3080 / 3070</option>
+                <option value="rtx3060" selected>RTX 3060 Ti / 3060</option>
+                <option value="rtx2060">RTX 2060 / 2070</option>
+                <option value="gtx1080">GTX 1080 Ti / 1080</option>
+              </optgroup>
+              <optgroup label="🔴 NVIDIA – Tối thiểu">
+                <option value="gtx1650">GTX 1660 / 1650 Super</option>
+                <option value="gtx1050ti">GTX 1050 Ti / 1060 3GB</option>
+                <option value="gtx1050">GTX 1050 / 960</option>
+              </optgroup>
+              <optgroup label="🔵 AMD">
+                <option value="rx7900">RX 7900 XTX / 7900 XT</option>
+                <option value="rx7700">RX 7700 XT / 7600</option>
+                <option value="rx6700">RX 6700 XT / 6800</option>
+                <option value="rx6600">RX 6600 / 6500</option>
+                <option value="rx580">RX 580 / 5500 XT</option>
+              </optgroup>
+              <optgroup label="🟦 Intel Arc">
+                <option value="arc770">Intel Arc A770 / A750</option>
+                <option value="arc380">Intel Arc A380</option>
+              </optgroup>
+              <optgroup label="⚪ Laptop / iGPU">
+                <option value="rtx4060m">RTX 4060 Laptop / 3060 Laptop</option>
+                <option value="rtx3050m">RTX 3050 Laptop / GTX 1650 Laptop</option>
+                <option value="igpu">Intel Iris Xe / iGPU (Yếu)</option>
+              </optgroup>
             </select>
-            <select id="userRamSelect" style="height:36px; padding:0 8px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:12px;">
+            <select id="userCpuSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
+              <optgroup label="AMD Ryzen">
+                <option value="ryzen9">Ryzen 9 7900X / 5900X</option>
+                <option value="ryzen7">Ryzen 7 7700 / 5700X</option>
+                <option value="ryzen5" selected>Ryzen 5 5600 / 7600</option>
+                <option value="ryzen3">Ryzen 3 4100 / 3300X</option>
+              </optgroup>
+              <optgroup label="Intel Core">
+                <option value="i9">Core i9-13900K / 12900K</option>
+                <option value="i7">Core i7-13700 / 12700</option>
+                <option value="i5">Core i5-13600 / 12400</option>
+                <option value="i3">Core i3-12100 / 10100</option>
+              </optgroup>
+              <optgroup label="Cũ / Yếu">
+                <option value="i5old">Core i5-6600 / Ryzen 5 1600</option>
+                <option value="i3old">Core i3-8100 / Athlon 3000G</option>
+              </optgroup>
+            </select>
+            <select id="userRamSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
+              <option value="64">RAM 64 GB</option>
               <option value="32">RAM 32 GB</option>
               <option value="16" selected>RAM 16 GB</option>
+              <option value="12">RAM 12 GB</option>
               <option value="8">RAM 8 GB</option>
               <option value="4">RAM 4 GB</option>
             </select>
           </div>
-          <div id="pcHardwareAssessment" style="padding:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--text-secondary);">Chọn GPU & RAM để đánh giá...</div>
+          <div id="pcHardwareAssessment" style="padding:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--text-secondary);">Chọn GPU / CPU / RAM để đánh giá...</div>
         </div>
         <!-- Bundle Tab -->
         <div id="bundleSavingsTabContent" style="display:none;">

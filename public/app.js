@@ -2639,17 +2639,40 @@ function setupGameExtraTools(appId) {
     if (targetId) fetchBundleData(targetId);
   };
 
-  // GPU tier ranking (higher = better)
+  // Full GPU tier map (0=iGPU ... 10=RTX4090)
   const GPU_TIER = {
-    igpu: 0, gtx1050ti: 2, gtx1650: 3, rtx3060: 5, rtx4070: 7
+    igpu: 0, arc380: 1, gtx1050: 1, rtx3050m: 1,
+    gtx1050ti: 2, arc770: 3, rx580: 3,
+    gtx1650: 3, rtx4060m: 3,
+    gtx1080: 4, rtx2060: 4, rx6600: 4,
+    rtx3060: 5, rx6700: 5,
+    rtx3080: 6, rx7700: 6, rtx4060: 6,
+    rtx4070: 7, rx7900: 7,
+    rtx4080: 8, rtx4090: 9
   };
+
+  // CPU tier map (0=old i3 ... 8=i9/Ryzen9)
+  const CPU_TIER = {
+    i3old: 1, i5old: 2, ryzen3: 3, i3: 3,
+    i5: 5, ryzen5: 5,
+    i7: 6, ryzen7: 6,
+    i9: 8, ryzen9: 8
+  };
+
+  const cpuSelect = document.getElementById("userCpuSelect");
 
   async function fetchAndEvaluateSpecs() {
     if (!pcAssess || !targetId) return;
     const gpu = gpuSelect?.value || "rtx3060";
+    const cpu = cpuSelect?.value || "ryzen5";
     const ram = Number(ramSelect?.value || 16);
 
-    pcAssess.innerHTML = `<div style="color:var(--text-muted);font-size:12px;">🔄 Đang lấy yêu cầu hệ thống từ Steam...</div>`;
+    pcAssess.innerHTML = `<div style="color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span> Đang lấy yêu cầu hệ thống từ Steam...
+    </div>`;
+
+    const userGpuTier = GPU_TIER[gpu] ?? 3;
+    const userCpuTier = CPU_TIER[cpu] ?? 3;
 
     try {
       const res = await fetch(`/api/sysreqs/${targetId}`);
@@ -2658,82 +2681,155 @@ function setupGameExtraTools(appId) {
 
       const text = (data.minimum + " " + data.recommended).toLowerCase();
 
-      // Parse RAM requirement from text (e.g. "8 gb ram", "16gb")
-      const ramMatch = text.match(/(\d+)\s*gb\s*(?:of\s*)?ram/);
-      const reqRam = ramMatch ? Number(ramMatch[1]) : 8;
+      // --- Parse RAM ---
+      const ramMatches = [...text.matchAll(/(\d+)\s*gb\s*(?:of\s*)?ram/g)].map(m => Number(m[1]));
+      const reqRamMin = ramMatches.length ? Math.min(...ramMatches) : 8;
+      const reqRamRec = ramMatches.length > 1 ? Math.max(...ramMatches) : reqRamMin;
 
-      // Parse GPU from text - find highest mentioned GPU tier
+      // --- Parse GPU ---
       const GPU_KEYWORDS = [
-        { keys: ["rtx 4070","rtx4070","rx 7800"], tier: 7, label: "RTX 4070 / RX 7800" },
-        { keys: ["rtx 3060","rtx3060","rx 6600"], tier: 5, label: "RTX 3060 / RX 6600" },
-        { keys: ["gtx 1650","gtx1650","rx 570"], tier: 3, label: "GTX 1650 / RX 570" },
-        { keys: ["gtx 1050","gtx1050"], tier: 2, label: "GTX 1050 Ti" },
-        { keys: ["intel iris","intel hd","igpu","integrated"], tier: 0, label: "Intel iGPU" },
+        { keys: ["rtx 4090","rtx4090"], tier: 9, label: "RTX 4090" },
+        { keys: ["rtx 4080","rtx4080"], tier: 8, label: "RTX 4080" },
+        { keys: ["rtx 4070","rtx4070","rx 7900"], tier: 7, label: "RTX 4070 / RX 7900" },
+        { keys: ["rtx 4060","rtx4060","rx 7700"], tier: 6, label: "RTX 4060 / RX 7700" },
+        { keys: ["rtx 3080","rtx3080","rx 6800"], tier: 6, label: "RTX 3080 / RX 6800" },
+        { keys: ["rtx 3070","rtx3070","rx 6700"], tier: 5, label: "RTX 3070 / RX 6700" },
+        { keys: ["rtx 3060","rtx3060","rtx 2070","rx 6600"], tier: 5, label: "RTX 3060 / RX 6600" },
+        { keys: ["rtx 2060","rtx2060","gtx 1080 ti","rx 5700"], tier: 4, label: "RTX 2060 / GTX 1080 Ti" },
+        { keys: ["gtx 1080","gtx1080","rx 5600"], tier: 4, label: "GTX 1080 / RX 5600" },
+        { keys: ["gtx 1660","gtx1660","gtx 1650 super","rx 5500","rx580"], tier: 3, label: "GTX 1660 / RX 580" },
+        { keys: ["gtx 1060","gtx1060","rx 480","rx480"], tier: 3, label: "GTX 1060 / RX 480" },
+        { keys: ["gtx 1050 ti","gtx1050ti","rx 470","rx470"], tier: 2, label: "GTX 1050 Ti / RX 470" },
+        { keys: ["gtx 1050","gtx1050","rx 460","rx460"], tier: 1, label: "GTX 1050 / RX 460" },
+        { keys: ["intel iris","intel hd","igpu","integrated","intel(r) uhd"], tier: 0, label: "Intel iGPU" },
       ];
+      let reqGpuMinTier = 2, reqGpuMinLabel = "GTX 1050 Ti";
+      let reqGpuRecTier = -1, reqGpuRecLabel = "";
 
-      let reqGpuTier = 2; // default minimum
-      let reqGpuLabel = "GTX 1050 Ti";
+      // Check minimum section
+      const minText = data.minimum.toLowerCase();
+      const recText = (data.recommended || "").toLowerCase();
       for (const g of GPU_KEYWORDS) {
-        if (g.keys.some(k => text.includes(k))) {
-          reqGpuTier = g.tier;
-          reqGpuLabel = g.label;
-          break;
+        if (reqGpuMinTier === 2 && g.keys.some(k => minText.includes(k))) {
+          reqGpuMinTier = g.tier; reqGpuMinLabel = g.label;
+        }
+        if (reqGpuRecTier === -1 && recText && g.keys.some(k => recText.includes(k))) {
+          reqGpuRecTier = g.tier; reqGpuRecLabel = g.label;
         }
       }
+      if (reqGpuRecTier === -1) { reqGpuRecTier = reqGpuMinTier; reqGpuRecLabel = reqGpuMinLabel; }
 
-      const userTier = GPU_TIER[gpu] ?? 3;
-      const ramOk = ram >= reqRam;
-      const gpuOk = userTier >= reqGpuTier;
-      const gpuExceed = userTier > reqGpuTier + 1;
-
-      let icon, color, verdict, detail;
-      if (gpuOk && gpuExceed && ramOk) {
-        icon = "✅"; color = "var(--success)";
-        verdict = "Máy chơi MƯỢT – 1080p High/Ultra";
-        detail = `GPU của bạn mạnh hơn yêu cầu đề xuất (${reqGpuLabel}). RAM đủ (${reqRam}GB yêu cầu, bạn có ${ram}GB).`;
-      } else if (gpuOk && ramOk) {
-        icon = "⚡"; color = "#f59e0b";
-        verdict = "Máy đủ – 1080p Medium";
-        detail = `GPU đáp ứng yêu cầu (${reqGpuLabel}). RAM đủ. Chỉnh Medium settings để ổn định FPS.`;
-      } else if (!gpuOk && !ramOk) {
-        icon = "❌"; color = "var(--error)";
-        verdict = "Máy KHÔNG đủ cấu hình";
-        detail = `Game yêu cầu tối thiểu ${reqGpuLabel} và ${reqRam}GB RAM. Máy bạn có thể không chạy được hoặc rất lag.`;
-      } else if (!gpuOk) {
-        icon = "⚠️"; color = "var(--error)";
-        verdict = "GPU yếu – Có thể lag";
-        detail = `GPU yêu cầu tối thiểu: ${reqGpuLabel}. RAM của bạn đủ (${ram}GB). Hạ xuống 720p Low.`;
-      } else {
-        icon = "⚠️"; color = "#f59e0b";
-        verdict = "RAM thiếu – Có thể giật";
-        detail = `Game yêu cầu ${reqRam}GB RAM, bạn chỉ có ${ram}GB. GPU đủ. Nâng cấp RAM để trải nghiệm tốt hơn.`;
+      // --- Parse CPU ---
+      const CPU_KEYWORDS = [
+        { keys: ["i9","ryzen 9"], tier: 8, label: "Core i9 / Ryzen 9" },
+        { keys: ["i7","ryzen 7"], tier: 6, label: "Core i7 / Ryzen 7" },
+        { keys: ["i5","ryzen 5"], tier: 5, label: "Core i5 / Ryzen 5" },
+        { keys: ["i3","ryzen 3"], tier: 3, label: "Core i3 / Ryzen 3" },
+      ];
+      let reqCpuTier = 3, reqCpuLabel = "Core i5 / Ryzen 5";
+      for (const c of CPU_KEYWORDS) {
+        if (c.keys.some(k => minText.includes(k))) { reqCpuTier = c.tier; reqCpuLabel = c.label; break; }
       }
 
-      // Show game's actual requirements
-      const minSnip = data.minimum ? data.minimum.substring(0, 200) : "";
+      // --- DirectX ---
+      const dxMatch = text.match(/directx[:\s]+version\s+(\d+)/i) || text.match(/directx\s*(\d+)/i);
+      const reqDx = dxMatch ? Number(dxMatch[1]) : 11;
+
+      // --- Score each component (0–100) ---
+      const gpuScore  = Math.min(100, Math.round((userGpuTier / Math.max(reqGpuRecTier, 1)) * 100));
+      const cpuScore  = Math.min(100, Math.round((userCpuTier / Math.max(reqCpuTier, 1)) * 100));
+      const ramScore  = Math.min(100, Math.round((ram / Math.max(reqRamRec, 1)) * 100));
+
+      const overallScore = Math.round((gpuScore * 0.5 + cpuScore * 0.3 + ramScore * 0.2));
+
+      // --- Verdict ---
+      let verdict, icon, mainColor, settingTip;
+      if (overallScore >= 120 || (userGpuTier >= reqGpuRecTier + 2 && ram >= reqRamRec)) {
+        icon = "🚀"; mainColor = "#22c55e"; verdict = "Chạy NGON – 4K / Ultra";
+        settingTip = "Máy bạn vượt xa yêu cầu đề xuất. Thử bật Ray Tracing hoặc 4K!";
+      } else if (overallScore >= 90 && userGpuTier >= reqGpuRecTier && ram >= reqRamRec) {
+        icon = "✅"; mainColor = "#22c55e"; verdict = "Chạy MƯỢT – 1080p High/Ultra";
+        settingTip = "Máy bạn đáp ứng yêu cầu đề xuất. High settings, 60+ FPS ổn định.";
+      } else if (overallScore >= 70 && userGpuTier >= reqGpuMinTier && ram >= reqRamMin) {
+        icon = "⚡"; mainColor = "#f59e0b"; verdict = "Chạy ổn – 1080p Medium";
+        settingTip = "Đáp ứng yêu cầu tối thiểu. Chỉnh Medium để giữ 60 FPS.";
+      } else if (userGpuTier >= reqGpuMinTier - 1 || ram >= reqRamMin) {
+        icon = "⚠️"; mainColor = "#ef4444"; verdict = "Có thể giật lag – 720p Low";
+        settingTip = "Gần đạt tối thiểu. 720p Low settings, khả năng dưới 30 FPS.";
+      } else {
+        icon = "❌"; mainColor = "#ef4444"; verdict = "KHÔNG đủ cấu hình";
+        settingTip = `Game yêu cầu tối thiểu: ${reqGpuMinLabel}, ${reqRamMin}GB RAM. Máy bạn khó chạy được.`;
+      }
+
+      const bar = (score, color) => {
+        const pct = Math.min(score, 100);
+        const c = score >= 100 ? "#22c55e" : score >= 75 ? "#f59e0b" : "#ef4444";
+        return `<div style="background:var(--border);border-radius:4px;height:6px;width:100%;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${c};border-radius:4px;transition:width 0.5s;"></div>
+        </div>`;
+      };
+      const pct = (v, req) => `<span style="font-size:10px;color:${v>=req?'#22c55e':'#ef4444'}">${v>=req?'✓':'✗'} ${v}/${req}</span>`;
+
+      const minSnip = data.minimum?.substring(0, 180) || "";
+
       pcAssess.innerHTML = `
-        <div style="font-weight:700; color:${color}; font-size:15px; margin-bottom:6px;">${icon} ${verdict}</div>
-        <div style="color:var(--text-secondary); font-size:12px; margin-bottom:10px;">${detail}</div>
-        ${minSnip ? `<details style="cursor:pointer;">
-          <summary style="font-size:11px; color:var(--text-muted); user-select:none;">📋 Yêu cầu tối thiểu từ Steam</summary>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:6px; line-height:1.6;">${minSnip}${data.minimum.length > 200 ? '...' : ''}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="font-size:28px;line-height:1;">${icon}</div>
+          <div>
+            <div style="font-weight:800;color:${mainColor};font-size:15px;">${verdict}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${settingTip}</div>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:8px;margin-bottom:10px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+              <span style="font-weight:600;">🎮 GPU</span>
+              <span style="color:var(--text-muted);">Bạn: <b>${gpu.toUpperCase()}</b> | Tối thiểu: ${reqGpuMinLabel} | Đề xuất: ${reqGpuRecLabel}</span>
+            </div>
+            ${bar(Math.min(Math.round(userGpuTier/Math.max(reqGpuRecTier,1)*100),120))}
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+              <span style="font-weight:600;">⚙️ CPU</span>
+              <span style="color:var(--text-muted);">Bạn: <b>${cpu.toUpperCase()}</b> | Yêu cầu: ${reqCpuLabel}</span>
+            </div>
+            ${bar(Math.round(userCpuTier/Math.max(reqCpuTier,1)*100))}
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+              <span style="font-weight:600;">💾 RAM</span>
+              <span style="color:var(--text-muted);">Bạn: <b>${ram}GB</b> | Tối thiểu: ${reqRamMin}GB | Đề xuất: ${reqRamRec}GB</span>
+            </div>
+            ${bar(Math.round(ram/Math.max(reqRamRec,1)*100))}
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-muted);display:flex;gap:16px;margin-bottom:${minSnip?'8px':'0'};">
+          <span>DirectX ${reqDx} yêu cầu</span>
+          <span>Overall score: <b style="color:${mainColor};">${overallScore}%</b></span>
+        </div>
+
+        ${minSnip ? `<details style="cursor:pointer;margin-top:6px;">
+          <summary style="font-size:10px;color:var(--text-muted);">📋 Xem yêu cầu tối thiểu từ Steam</summary>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.6;white-space:pre-wrap;">${minSnip}${data.minimum.length > 180 ? '...' : ''}</div>
         </details>` : ''}
       `;
     } catch (e) {
-      // Fallback: generic assessment
-      const userTier = GPU_TIER[gpuSelect?.value || "rtx3060"] ?? 3;
-      const ram = Number(ramSelect?.value || 16);
-      let icon = "✅", color = "var(--success)", msg = "Cấu hình tốt – chạy được hầu hết game hiện đại.";
-      if (userTier <= 0 || ram < 8) { icon = "❌"; color = "var(--error)"; msg = "Cấu hình yếu – có thể không chạy được game nặng."; }
-      else if (userTier <= 2 || ram <= 8) { icon = "⚠️"; color = "#f59e0b"; msg = "Cấu hình tối thiểu – chỉnh Low settings."; }
+      const userGpuTier2 = GPU_TIER[gpuSelect?.value || "rtx3060"] ?? 3;
+      const ram2 = Number(ramSelect?.value || 16);
+      let icon = "✅", color = "#22c55e", msg = "Cấu hình tốt – đủ chạy hầu hết game hiện đại.";
+      if (userGpuTier2 <= 0 || ram2 < 8) { icon = "❌"; color = "#ef4444"; msg = "Cấu hình yếu – khó chạy game AAA hiện đại."; }
+      else if (userGpuTier2 <= 2 || ram2 <= 8) { icon = "⚠️"; color = "#f59e0b"; msg = "Cấu hình tối thiểu – chỉnh Low settings."; }
       pcAssess.innerHTML = `
-        <div style="font-weight:700; color:${color}; font-size:14px;">${icon} ${msg}</div>
-        <div style="color:var(--text-muted); font-size:11px; margin-top:4px;">(Không lấy được yêu cầu cụ thể từ Steam cho game này)</div>
+        <div style="font-weight:700;color:${color};font-size:14px;">${icon} ${msg}</div>
+        <div style="color:var(--text-muted);font-size:11px;margin-top:4px;">⚠️ Không lấy được yêu cầu cụ thể từ Steam cho game này.</div>
       `;
     }
   }
 
   gpuSelect?.addEventListener("change", fetchAndEvaluateSpecs);
+  cpuSelect?.addEventListener("change", fetchAndEvaluateSpecs);
   ramSelect?.addEventListener("change", fetchAndEvaluateSpecs);
   fetchAndEvaluateSpecs();
 
