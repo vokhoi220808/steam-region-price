@@ -992,13 +992,15 @@ async function fetchPersonalizedDeals() {
     loadDealMetadataForCurrentCategory();
   } catch (error) {
     loading.style.display = "none";
-    const empty = document.getElementById("dealsEmpty");
-    empty.classList.remove("hidden");
-    empty.querySelector("h3").textContent = error.message;
-    empty.querySelector("p").textContent = "Đăng nhập Steam và đồng bộ Wishlist để nhận gợi ý phù hợp.";
-    const action = document.getElementById("dealsResetFilterBtn");
-    action.textContent = "Đăng nhập Steam";
-    action.onclick = () => window.steamCloudAccount?.open();
+    if (dealsState.category === "personalized") {
+      const empty = document.getElementById("dealsEmpty");
+      empty.classList.remove("hidden");
+      empty.querySelector("h3").textContent = "Đăng nhập Steam để xem deal dành cho bạn";
+      empty.querySelector("p").textContent = "Đăng nhập Steam và đồng bộ Wishlist để nhận gợi ý phù hợp.";
+      const action = document.getElementById("dealsResetFilterBtn");
+      action.textContent = "Đăng nhập Steam";
+      action.onclick = () => window.steamCloudAccount?.open();
+    }
   }
 }
 
@@ -1011,7 +1013,16 @@ function renderDealsView() {
   if (!dealsData || !dealsData[dealsState.category] || !dealsData[dealsState.category].items) {
     grid.innerHTML = "";
     spotlightContainer.style.display = "none";
-    emptyState.classList.remove("hidden");
+    if (dealsState.category === "personalized") {
+      emptyState.classList.remove("hidden");
+      emptyState.querySelector("h3").textContent = "Đăng nhập Steam để xem deal dành cho bạn";
+      emptyState.querySelector("p").textContent = "Đăng nhập Steam và đồng bộ Wishlist để nhận gợi ý phù hợp.";
+      const action = document.getElementById("dealsResetFilterBtn");
+      action.textContent = "Đăng nhập Steam";
+      action.onclick = () => window.steamCloudAccount?.open();
+    } else {
+      emptyState.classList.add("hidden");
+    }
     return;
   }
   
@@ -1073,6 +1084,15 @@ function renderDealsView() {
     renderSpotlight(spotlightItems);
   }
   
+  // Reset emptyState text back to standard filter empty state
+  emptyState.querySelector("h3").textContent = "Không tìm thấy game phù hợp";
+  emptyState.querySelector("p").textContent = "Hãy thử thay đổi từ khóa hoặc bỏ bớt bộ lọc.";
+  const actionBtn = document.getElementById("dealsResetFilterBtn");
+  if (actionBtn) {
+    actionBtn.textContent = "Xóa tất cả bộ lọc";
+    actionBtn.onclick = () => resetDealsFilters();
+  }
+
   // 5. RENDER GRID/LIST
   if (items.length === 0 && !isDefaultView) {
     grid.innerHTML = "";
