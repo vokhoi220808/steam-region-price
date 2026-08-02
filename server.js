@@ -861,6 +861,9 @@ app.get('/api/purchase-advice/:appId', async (req, res, next) => {
       stats: history?.stats
     });
     res.json(advice);
+  } catch (error) { next(error); }
+});
+
 app.get('/api/wishlist/compare', async (req, res, next) => {
   try {
     const rawIds = String(req.query.steamIds || '').split(',').map((s) => s.trim()).filter(Boolean);
