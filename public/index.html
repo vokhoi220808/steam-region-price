@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
   <link rel="stylesheet" href="tracker.css?v=24" />
 </head>
 <body>
@@ -40,7 +40,10 @@
       </nav>
       
       <div class="header-actions">
-        <button class="steam-account-btn" id="steamAccountBtn" type="button"><span>Đăng nhập Steam</span></button>
+        <button class="steam-account-btn" id="steamAccountBtn" type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid rgba(102, 192, 244, 0.4); border-radius: 6px; background: linear-gradient(135deg, rgba(27, 103, 145, 0.4) 0%, rgba(19, 45, 76, 0.8) 100%); color: #66c0f4; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.373 1.203-.594 1.913-.594.108 0 .212.012.318.022l3.065-4.447v-.06c0-2.107 1.708-3.816 3.816-3.816s3.816 1.709 3.816 3.816-1.708 3.816-3.816 3.816h-.086l-4.367 3.111c.01.101.02.203.02.308 0 1.986-1.503 3.62-3.441 3.799l-2.457 5.945C3.896 23.491 7.697 24 11.979 24c6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg>
+          <span>Đăng nhập Steam</span>
+        </button>
         <select id="globalRegionSelect" class="header-region-select" title="Chọn quốc gia / tiền tệ">
           <option value="VN">VN (VND)</option>
           <option value="US">US (USD)</option>

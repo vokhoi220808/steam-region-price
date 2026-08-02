@@ -171,7 +171,7 @@ function renderAccountButton() {
     button.innerHTML = `<img src="${safeHttpUrl(accountState.account.avatarUrl)}" alt=""><span>${escapeHtml(accountState.account.displayName)}</span>`;
     button.title = 'Tài khoản Steam và Cloud Sync';
   } else {
-    button.innerHTML = '<span>Đăng nhập Steam</span>';
+    button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.373 1.203-.594 1.913-.594.108 0 .212.012.318.022l3.065-4.447v-.06c0-2.107 1.708-3.816 3.816-3.816s3.816 1.709 3.816 3.816-1.708 3.816-3.816 3.816h-.086l-4.367 3.111c.01.101.02.203.02.308 0 1.986-1.503 3.62-3.441 3.799l-2.457 5.945C3.896 23.491 7.697 24 11.979 24c6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg><span>Đăng nhập Steam</span>`;
     button.title = 'Đăng nhập Steam để đồng bộ';
   }
 }
