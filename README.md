@@ -303,6 +303,22 @@ Server đóng vai trò **CORS proxy** — tất cả request đến Steam API đ
 - Công cụ chỉ dùng để tham khảo, **không hỗ trợ** đổi vùng tài khoản Steam.
 
 ---
+## Steam Cloud, PWA và lịch sử giá nội bộ
+
+Phiên bản này hỗ trợ đăng nhập Steam OpenID, đồng bộ tracker/Wishlist theo tài khoản, deal cá nhân hóa, Web Push, PWA/offline shell, snapshot giá nội bộ và dashboard vận hành.
+
+1. Chạy lần lượt migration `supabase/migrations/001_cloud_price_alerts.sql` và `supabase/migrations/002_accounts_pwa_history_reliability.sql` trong Supabase SQL Editor.
+2. Sao chép các biến trong `.env.example` vào Vercel. `SESSION_SECRET` phải là chuỗi ngẫu nhiên dài; `PUBLIC_BASE_URL` phải đúng domain production.
+3. Tạo VAPID key bằng `npx web-push generate-vapid-keys`, sau đó đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` và `VAPID_SUBJECT`.
+4. Thêm SteamID64 của quản trị viên vào `ADMIN_STEAM_IDS`. Dashboard chỉ hiện với các tài khoản này; `ADMIN_TOKEN` dành cho kiểm tra API thủ công.
+5. Có thể thêm Upstash Redis để chia sẻ deals cache và rate-limit counter giữa các Vercel Function instance. Nếu bỏ trống, ứng dụng tự dùng in-memory fallback.
+
+Cron không quét 10.000 game mỗi ngày. Nó chỉ đọc `price_alerts` đang bật, theo batch `ALERT_BATCH_SIZE`, cache request trùng và lưu snapshot tối đa khoảng một lần/ngày khi giá không đổi. Khi giá hoặc mức giảm thay đổi, snapshot mới được lưu để tạo biểu đồ và thống kê trung bình 90 ngày. Dự đoán sale là heuristic từ chu kỳ snapshot, không phải cam kết về đợt giảm giá tương lai.
+
+Các API mới: `GET /api/auth/me`, `GET /api/auth/steam`, `GET|POST /api/account/*`, `GET /api/account/deals`, `GET /api/history/internal/:appId`, `GET|POST /api/push/*`, `GET /api/health` và `GET /api/admin/status`.
+
+---
+
 ## License
 
 Licensed under the [MIT License](LICENSE).

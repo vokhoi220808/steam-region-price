@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1320" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <title>So sánh giá game Steam theo từng khu vực</title>
   <meta name="description" content="Steam Price Compare là công cụ giúp bạn kiểm tra và so sánh giá game Steam tại nhiều quốc gia và khu vực khác nhau." />
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=5" />
   <link rel="stylesheet" href="tracker.css?v=24" />
 </head>
 <body>
@@ -34,6 +36,7 @@
       </nav>
       
       <div class="header-actions">
+        <button class="steam-account-btn" id="steamAccountBtn" type="button"><span>Đăng nhập Steam</span></button>
         <select id="globalRegionSelect" class="header-region-select" title="Chọn quốc gia / tiền tệ">
           <option value="VN">VN (VND)</option>
           <option value="US">US (USD)</option>
@@ -475,6 +478,7 @@
       <!-- TABS -->
       <div class="deals-tabs-container" style="display: flex; justify-content: center; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
         <div class="deals-tabs" style="display: flex; gap: 8px; background: var(--surface-elevated); padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <button class="btn deal-tab-btn" data-category="personalized" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">✨ Dành cho bạn</button>
           <button class="btn active deal-tab-btn" data-category="specials" style="background: var(--primary-soft); color: var(--primary); border: 1px solid var(--primary-soft); border-radius: var(--radius-sm); font-weight: 600;">Khuyến mãi nổi bật</button>
           <button class="btn deal-tab-btn" data-category="deep_discounts" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Giảm sâu nhất</button>
           <button class="btn deal-tab-btn" data-category="free" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: var(--radius-sm);">Game Miễn Phí</button>
@@ -521,6 +525,12 @@
             <option value="all">Game & DLC</option>
             <option value="game">Game gốc</option>
             <option value="dlc">DLC / Nội dung</option>
+          </select>
+          <select id="dealBudgetFilter" class="deal-filter-select">
+            <option value="0">Mọi ngân sách</option>
+            <option value="100000">Dưới 100k</option>
+            <option value="250000">Dưới 250k</option>
+            <option value="500000">Dưới 500k</option>
           </select>
         </div>
         
@@ -711,6 +721,7 @@
     </div>
     <div class="modal-body">
       <div class="history-source-switch" role="tablist" aria-label="Nguồn dữ liệu lịch sử">
+        <button type="button" class="history-source-btn" data-history-source="internal" role="tab" aria-selected="false">Nội bộ</button>
         <button type="button" class="history-source-btn active" data-history-source="real" role="tab" aria-selected="true">API thật</button>
         <button type="button" class="history-source-btn" data-history-source="simulated" role="tab" aria-selected="false">Mô phỏng</button>
       </div>
@@ -738,8 +749,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script type="module" src="modules/tracker/tracker-page.js?v=21"></script>
-  <script src="app.js?v=12"></script>
+  <script type="module" src="modules/tracker/tracker-page.js?v=22"></script>
+  <script type="module" src="modules/account/account-manager.js?v=3"></script>
+  <script src="app.js?v=16"></script>
   <!-- Footer -->
 <style>
 .site-footer{

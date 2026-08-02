@@ -1,0 +1,13 @@
+{
+  "name": "Steam Price Compare",
+  "short_name": "Steam Prices",
+  "description": "Theo dõi và so sánh giá Steam theo khu vực.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070b12",
+  "theme_color": "#0b1320",
+  "icons": [
+    { "src": "/logo.jpg", "sizes": "any", "type": "image/jpeg", "purpose": "any" }
+  ]
+}

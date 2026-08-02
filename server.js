@@ -7,16 +7,26 @@ import {
   disableCloudAlerts,
   getCloudAlertCapabilities,
   runCloudAlertChecks,
+  runRetryQueue,
   sendCloudAlertTest,
   syncCloudAlerts
 } from "./server/cloud-alerts.js";
+import { attachAccountSession, createAccountRouter } from "./server/account.js";
+import { createPushRouter, sendUserPush } from "./server/push.js";
+import { getInternalHistory, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
+import { createReliabilityRouter, distributedCacheGet, distributedCacheSet, finishCronRun, rateLimit, startCronRun, updateServiceHealth } from "./server/reliability.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(express.json({ limit: "96kb" }));
+app.use("/api", rateLimit({ limit: 180, windowMs: 60000 }));
+app.use(attachAccountSession);
+app.use("/api", createAccountRouter());
+app.use("/api", createPushRouter());
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders: (res, path) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -314,16 +324,16 @@ async function getCloudAlertQuote(alert) {
     ? await getRegionalPackagePrice(alert.app_id, region, "vietnamese")
     : await getRegionalPrice(alert.app_id, region, "vietnamese");
   if (!price?.available) return { available: false };
-  if (price.isFree) return { available: true, amount: 0, discountPercent: 100 };
+  if (price.isFree) return { available: true, amount: 0, rawAmount: 0, currency: String(alert.target_currency || "VND"), originalAmount: 0, discountPercent: 100 };
 
   const targetCurrency = String(alert.target_currency || "VND").toUpperCase();
   if (price.currency === targetCurrency) {
-    return { available: true, amount: price.final, discountPercent: price.discountPercent || 0 };
+    return { available: true, amount: price.final, rawAmount: price.final, currency: price.currency, originalAmount: price.initial, discountPercent: price.discountPercent || 0 };
   }
   const rates = await getExchangeRates(targetCurrency);
   const rate = rates?.[price.currency];
   if (!Number.isFinite(rate) || rate <= 0) return { available: false };
-  return { available: true, amount: price.final / rate, discountPercent: price.discountPercent || 0 };
+  return { available: true, amount: price.final / rate, rawAmount: price.final, currency: price.currency, originalAmount: price.initial, discountPercent: price.discountPercent || 0 };
 }
 
 async function getPackageMetadata(packageId, includedApps = [], language = "vietnamese") {
@@ -540,23 +550,135 @@ app.get("/api/history/:appId", async (req, res) => {
   }
 });
 
+app.get("/api/history/internal/:appId", async (req, res) => {
+  if (!/^\d+$/.test(req.params.appId)) return res.status(400).json({ error: "Steam App ID không hợp lệ." });
+  try {
+    res.json(await getInternalHistory(req.params.appId, {
+      regionCode: String(req.query.region || "vn").toLowerCase(),
+      productType: req.query.type === "sub" ? "sub" : "app",
+      days: Number(req.query.days || 365)
+    }));
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
+async function getDealsData(cc) {
+  const cacheKey = `deals:${cc}`;
+  let cached = getCache(cacheKey);
+  if (!cached) cached = await distributedCacheGet(cacheKey);
+  if (cached) {
+    setCache(cacheKey, cached, DEALS_TTL);
+    return cached;
+  }
+  const data = await fetchJson(`https://store.steampowered.com/api/featuredcategories?cc=${cc}`);
+  if (!data) throw new Error("Invalid data from Steam");
+  setCache(cacheKey, data, DEALS_TTL);
+  distributedCacheSet(cacheKey, data, Math.floor(DEALS_TTL / 1000));
+  return data;
+}
+
 app.get('/api/deals', async (req, res) => {
   try {
     const cc = String(req.query.cc || 'VN').toUpperCase();
-    const cacheKey = `deals:${cc}`;
-    const cached = getCache(cacheKey);
-    if (cached) return res.json(cached);
-    const dealsUrl = `https://store.steampowered.com/api/featuredcategories?cc=${cc}`;
-    const data = await fetchJson(dealsUrl);
-    if (data) {
-      setCache(cacheKey, data, DEALS_TTL);
-      res.json(data);
-    } else {
-      res.status(500).json({ error: "Invalid data from Steam" });
+    const maxPrice = Number(req.query.maxPrice);
+    const data = await getDealsData(cc);
+    if (Number.isFinite(maxPrice) && maxPrice > 0) {
+      const filtered = {};
+      for (const [key, category] of Object.entries(data || {})) {
+        if (!category?.items) continue;
+        filtered[key] = {
+          ...category,
+          items: category.items.filter((item) => Number(item.final_price || item.finalPrice) <= maxPrice)
+        };
+      }
+      return res.json(filtered);
     }
+    res.json(data);
   } catch (err) {
     console.error("Steam Deals API Error:", err.message);
     res.status(500).json({ error: "Failed to fetch top deals" });
+  }
+});
+
+app.get('/api/account/deals', async (req, res) => {
+  if (!req.account) return res.status(401).json({ error: "Đăng nhập Steam để xem deal dành cho bạn." });
+  try {
+    const { supabaseRequest } = await import("./server/cloud-alerts.js");
+    const cc = String(req.query.cc || 'VN').toUpperCase();
+    const maxPrice = Number(req.query.maxPrice);
+    const [data, tracker, wishlist] = await Promise.all([
+      getDealsData(cc),
+      supabaseRequest(`cloud_tracker?user_id=eq.${req.account.id}&select=*`),
+      supabaseRequest(`user_wishlist?user_id=eq.${req.account.id}&select=app_id,metadata`)
+    ]);
+    const wishlistIds = new Set((wishlist || []).map((item) => Number(item.app_id)));
+    const trackerMap = new Map((tracker || []).map((item) => [Number(item.app_id), item]));
+    const trackedNames = (tracker || []).map((item) => String(item.game_data?.name || "").toLowerCase()).filter(Boolean);
+    const unique = new Map();
+    for (const category of Object.values(data || {})) {
+      for (const item of Array.isArray(category?.items) ? category.items : []) unique.set(Number(item.id), item);
+    }
+    for (const row of wishlist || []) {
+      const appId = Number(row.app_id);
+      if (!unique.has(appId)) {
+        const meta = row.metadata || {};
+        const sub = meta.subs?.[0] || {};
+        const discount = Number(meta.discount_pct || sub.discount_pct || 0);
+        if (discount > 0) {
+          unique.set(appId, {
+            id: appId,
+            name: meta.name || `App ${appId}`,
+            header_image: meta.capsule || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+            discount_percent: discount,
+            original_price: sub.price ? Math.round(sub.price / (1 - discount / 100)) : null,
+            final_price: sub.price || null,
+            currency: "VND"
+          });
+        }
+      }
+    }
+    const candidates = [...unique.values()].map((item) => {
+      const appId = Number(item.id);
+      const reasons = [];
+      let personalScore = Number(item.discount_percent || 0);
+      if (wishlistIds.has(appId)) { personalScore += 120; reasons.push("Trong Wishlist Steam"); }
+      const tracked = trackerMap.get(appId);
+      if (tracked) {
+        personalScore += 90;
+        reasons.push("Đang theo dõi");
+        if (tracked.target_amount !== null && Number.isFinite(Number(tracked.target_amount))) {
+          const finalPrice = Number(item.final_price || item.finalPrice || 0);
+          if (finalPrice > 0 && finalPrice <= Number(tracked.target_amount) * 1.15) {
+            personalScore += 80;
+            reasons.push("Gần đạt giá mục tiêu");
+          }
+        }
+      }
+      const itemName = String(item.name || "").toLowerCase();
+      const isDlcOrBundle = item.is_dlc || item.type === "dlc" || item.type === "bundle" || /dlc|soundtrack|expansion|pack|pass|bundle/i.test(itemName);
+      if (isDlcOrBundle && trackedNames.some((name) => name.length > 3 && itemName.includes(name))) {
+        personalScore += 70;
+        reasons.push("DLC/Bundle liên quan");
+      }
+      return { ...item, personalScore, personalReasons: reasons };
+    }).filter((item) => item.personalReasons.length);
+
+    if (Number.isFinite(maxPrice) && maxPrice > 0) {
+      for (let i = candidates.length - 1; i >= 0; i--) {
+        if (Number(candidates[i].final_price || candidates[i].finalPrice) > maxPrice) {
+          candidates.splice(i, 1);
+        }
+      }
+    }
+
+    candidates.sort((a, b) => b.personalScore - a.personalScore);
+    const items = candidates.slice(0, 60);
+
+    res.json({ personalized: { id: "personalized", name: "Deal dành cho bạn", items }, basedOn: { wishlist: wishlistIds.size, tracker: trackerMap.size }, generatedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error("Personalized Deals Error:", error.message);
+    res.status(500).json({ error: "Không thể tạo deal cá nhân hóa." });
   }
 });
 
@@ -706,16 +828,38 @@ async function handleCloudAlertCron(req, res) {
   if (!supplied || !secureStringEqual(supplied, cronSecret)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+  const runId = await startCronRun("price-alerts").catch(() => null);
+  const started = Date.now();
   try {
-    res.json(await runCloudAlertChecks({ getQuote: getCloudAlertQuote, concurrency: 4 }));
+    const summary = await runCloudAlertChecks({
+      getQuote: getCloudAlertQuote,
+      onQuote: (alert, quote) => recordPriceSnapshot({ appId: alert.app_id, productType: alert.product_type, regionCode: alert.region_code, priceAmount: quote.rawAmount ?? quote.amount, originalAmount: quote.originalAmount, currency: quote.currency || alert.target_currency, discountPercent: quote.discountPercent, available: quote.available }),
+      sendPush: sendUserPush,
+      concurrency: 4
+    });
+    summary.retryQueue = await runRetryQueue({ sendPush: sendUserPush });
+    summary.historySweep = await runTrackedHistorySweep({ getQuote: getCloudAlertQuote, concurrency: 4 });
+    await finishCronRun(runId, summary);
+    await updateServiceHealth("supabase", "operational", "Cron data persisted");
+    await updateServiceHealth("steam-api", summary.failed > Math.max(2, summary.checked / 2) ? "degraded" : "operational", `${summary.checked} prices checked`, Date.now() - started);
+    res.json(summary);
   } catch (error) {
     console.error("Cloud Alert Cron Error:", error.message);
+    await finishCronRun(runId, null, error);
+    await updateServiceHealth("steam-api", "down", error.message, Date.now() - started);
     res.status(500).json({ error: "Không thể hoàn tất lượt kiểm tra giá." });
   }
 }
 
 app.get('/api/cron/check-alerts', handleCloudAlertCron);
 app.post('/api/cron/check-alerts', handleCloudAlertCron);
+
+app.use("/api", createReliabilityRouter({ cacheStats, cacheSize: () => cache.size }));
+
+app.use((error, _req, res, _next) => {
+  console.error("API Error:", error.message);
+  res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Đã xảy ra lỗi máy chủ." });
+});
 
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));

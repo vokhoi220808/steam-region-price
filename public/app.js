@@ -438,14 +438,14 @@ let priceHistoryChartInstance = null;
 let activeHistorySource = "real";
 
 function renderPriceHistoryChart(months = 12) {
-  return activeHistorySource === "simulated"
-    ? renderSimulatedHistoryChart(months)
-    : renderRealHistoryChart(months);
+  if (activeHistorySource === "internal") return renderInternalHistoryChart(months);
+  return activeHistorySource === "simulated" ? renderSimulatedHistoryChart(months) : renderRealHistoryChart(months);
 }
 
 async function init() {
   applyI18n();
   setupEvents();
+  setupDealsEvents();
   renderRegions();
   setupCurrencyDropdown();
   
@@ -693,6 +693,7 @@ let dealsState = {
   genreFilter: "all",
   ccuFilter: "0",
   contentFilter: "all",
+  budgetFilter: "0",
   metadataLoading: false,
   page: 1,
   itemsPerPage: 12
@@ -868,6 +869,35 @@ async function fetchTopDeals(force = false) {
   }
 }
 
+window.addEventListener('account:deals-invalidate', () => {
+  if (dealsData) dealsData.personalized = null;
+});
+
+async function fetchPersonalizedDeals() {
+  if (dealsData?.personalized) return renderDealsView();
+  const loading = document.getElementById("dealsLoading");
+  loading.style.display = "block";
+  loading.innerHTML = '<div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite">Đang tạo deal dành cho bạn…</div>';
+  try {
+    const response = await fetch(`/api/account/deals?cc=${state.region}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Không thể tải deal cá nhân hóa.");
+    dealsData = { ...(dealsData || {}), personalized: data.personalized };
+    loading.style.display = "none";
+    renderDealsView();
+    loadDealMetadataForCurrentCategory();
+  } catch (error) {
+    loading.style.display = "none";
+    const empty = document.getElementById("dealsEmpty");
+    empty.classList.remove("hidden");
+    empty.querySelector("h3").textContent = error.message;
+    empty.querySelector("p").textContent = "Đăng nhập Steam và đồng bộ Wishlist để nhận gợi ý phù hợp.";
+    const action = document.getElementById("dealsResetFilterBtn");
+    action.textContent = "Đăng nhập Steam";
+    action.onclick = () => window.steamCloudAccount?.open();
+  }
+}
+
 function renderDealsView() {
   const grid = document.getElementById("dealsGrid");
   const spotlightContainer = document.getElementById("dealsSpotlight");
@@ -907,6 +937,10 @@ function renderDealsView() {
     items = items.filter((deal) => dealsState.contentFilter === "dlc"
       ? deal.contentType === "dlc"
       : deal.contentType !== "dlc");
+  }
+  const maxBudget = Number(dealsState.budgetFilter) || 0;
+  if (maxBudget > 0) {
+    items = items.filter((deal) => Number(deal.final_price || deal.finalPrice || 0) <= maxBudget);
   }
   
   // 3. SORT
@@ -1085,6 +1119,7 @@ function generateDealCardHTML(deal, index) {
         </div>
         
         ${regionHtml ? `<div class="dc-region">${regionHtml}</div>` : ''}
+        ${deal.personalReasons?.length ? `<div class="deal-meta-row">${deal.personalReasons.map(reason => `<span class="deal-meta-pill">✨ ${reason}</span>`).join("")}</div>` : ''}
         ${deal.metadataLoaded ? `<div class="deal-meta-row">
           ${deal.reviewScoreDesc ? `<span class="deal-meta-pill">${deal.reviewScoreDesc}</span>` : ''}
           ${deal.ccu ? `<span class="deal-meta-pill">${Number(deal.ccu).toLocaleString("vi-VN")} CCU</span>` : ''}
@@ -1149,8 +1184,11 @@ function setupDealsEvents() {
       
       dealsState.category = t.dataset.category;
       dealsState.page = 1;
-      renderDealsView();
-      loadDealMetadataForCurrentCategory();
+      if (dealsState.category === "personalized") fetchPersonalizedDeals();
+      else {
+        renderDealsView();
+        loadDealMetadataForCurrentCategory();
+      }
     });
   });
   
@@ -1174,7 +1212,8 @@ function setupDealsEvents() {
     ["dealReviewFilter", "reviewFilter"],
     ["dealGenreFilter", "genreFilter"],
     ["dealCcuFilter", "ccuFilter"],
-    ["dealContentFilter", "contentFilter"]
+    ["dealContentFilter", "contentFilter"],
+    ["dealBudgetFilter", "budgetFilter"]
   ].forEach(([id, key]) => {
     document.getElementById(id)?.addEventListener("change", (event) => {
       dealsState[key] = event.target.value;
@@ -1322,27 +1361,6 @@ function setupEvents() {
   if (navCompare) navCompare.addEventListener("click", (e) => { e.preventDefault(); switchView("compare"); });
   if (navDeals) navDeals.addEventListener("click", (e) => { e.preventDefault(); switchView("deals"); });
   if (navTracker) navTracker.addEventListener("click", (e) => { e.preventDefault(); switchView("tracker"); });
-  
-  document.querySelectorAll(".deal-tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".deal-tab-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      dealsState.category = btn.dataset.category;
-      renderDealsList();
-    });
-  });
-  
-  const dealSearchInput = document.getElementById("dealSearchInput");
-  if (dealSearchInput) dealSearchInput.addEventListener("input", e => {
-    dealsState.search = e.target.value;
-    renderDealsList();
-  });
-  
-  const dealSortSelect = document.getElementById("dealSortSelect");
-  if (dealSortSelect) dealSortSelect.addEventListener("change", e => {
-    dealsState.sort = e.target.value;
-    renderDealsList();
-  });
   
   const searchRegionInput = document.getElementById("regionSearchInput");
   if (searchRegionInput) searchRegionInput.addEventListener("input", e => renderRegions(e.target.value));
@@ -1989,6 +2007,44 @@ function renderChart() {
   }).join("");
 }
 
+async function renderInternalHistoryChart(months = 12) {
+  const canvas = document.getElementById("priceHistoryChart");
+  const loading = document.getElementById("chartLoadingIndicator");
+  const summary = document.getElementById("historyLowSummary");
+  const noteReal = document.querySelector(".history-note-real");
+  const noteSimulated = document.querySelector(".history-note-simulated");
+  if (priceHistoryChartInstance) priceHistoryChartInstance.destroy();
+  canvas.style.display = "none";
+  summary?.classList.add("hidden");
+  noteSimulated?.classList.add("hidden");
+  if (noteReal) { noteReal.classList.remove("hidden"); noteReal.textContent = "* Snapshot nội bộ được ghi cho game đang theo dõi; dự đoán chỉ là heuristic theo chu kỳ sale."; }
+  loading.classList.remove("hidden");
+  loading.innerHTML = '<div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite">Đang tải snapshot nội bộ…</div>';
+  try {
+    const region = (state.currentData.prices.find((price) => price.code === state.region.toLowerCase())?.code || "vn").toLowerCase();
+    const response = await fetch(`/api/history/internal/${state.currentData.appId}?region=${region}&type=${state.currentData.productType || "app"}&days=${months * 31}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Không thể tải lịch sử nội bộ.");
+    if (!data.points?.length) throw new Error("Chưa có snapshot. Cron sẽ bắt đầu ghi khi game có giá mục tiêu.");
+    const currency = data.points.at(-1).currency;
+    const labels = data.points.map((point) => new Date(point.captured_at).toLocaleDateString(state.lang === "vi" ? "vi-VN" : "en-US"));
+    const values = data.points.map((point) => Number(point.price_amount));
+    const versus = data.stats.versusAverage90Percent;
+    summary.innerHTML = `<span class="history-low-badge">NỘI BỘ · ${data.stats.samples} SNAPSHOT</span><span>Giá hiện tại ${versus == null ? "chưa đủ dữ liệu so với" : `${Math.abs(versus).toFixed(1)}% ${versus <= 0 ? "thấp hơn" : "cao hơn"}`} trung bình 90 ngày</span><strong>${data.prediction.label}${data.prediction.probability == null ? "" : ` · ${data.prediction.probability}%`}</strong><small>${data.prediction.basis}</small>`;
+    summary.classList.remove("hidden");
+    loading.classList.add("hidden");
+    canvas.style.display = "block";
+    const ctx = canvas.getContext("2d");
+    priceHistoryChartInstance = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets: [{ label: `${region.toUpperCase()} · ${currency}`, data: values, borderColor: "#66c0f4", backgroundColor: "rgba(102,192,244,.14)", fill: true, stepped: true, tension: .15, pointRadius: values.length > 50 ? 0 : 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (context) => new Intl.NumberFormat(state.lang === "vi" ? "vi-VN" : "en-US", { style: "currency", currency }).format(context.parsed.y) } } }, scales: { x: { ticks: { color: "#748196", maxTicksLimit: 10 } }, y: { ticks: { color: "#748196" }, grid: { color: "rgba(42,58,81,.45)" } } } }
+    });
+  } catch (error) {
+    loading.innerHTML = `<div style="color:var(--danger)">${error.message}</div>`;
+  }
+}
+
 async function renderRealHistoryChart(months = 12) {
   const canvas = document.getElementById("priceHistoryChart");
   const loadingIndicator = document.getElementById("chartLoadingIndicator");
@@ -2008,7 +2064,10 @@ async function renderRealHistoryChart(months = 12) {
   `;
   loadingIndicator.classList.remove("hidden");
   if (note) note.style.display = "none";
-  if (noteReal) noteReal.classList.remove("hidden");
+  if (noteReal) {
+    noteReal.classList.remove("hidden");
+    noteReal.textContent = state.lang === "vi" ? "* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại." : "* Original USD data (from ITAD) converted to current exchange rates.";
+  }
   if (noteSimulated) noteSimulated.classList.add("hidden");
   lowSummary?.classList.add("hidden");
   

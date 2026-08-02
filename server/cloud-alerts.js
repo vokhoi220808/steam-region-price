@@ -37,7 +37,7 @@ function requireDatabase() {
   return config;
 }
 
-async function supabaseRequest(resource, { method = "GET", body, prefer, headers = {} } = {}) {
+export async function supabaseRequest(resource, { method = "GET", body, prefer, headers = {} } = {}) {
   const config = requireDatabase();
   const response = await fetch(`${config.supabaseUrl}/rest/v1/${resource}`, {
     method,
@@ -62,6 +62,11 @@ async function supabaseRequest(resource, { method = "GET", body, prefer, headers
     throw new Error(message);
   }
   return data;
+}
+
+export function cloudDatabaseConfigured() {
+  const config = env();
+  return Boolean(config.supabaseUrl && config.supabaseKey);
 }
 
 function hashSecret(secret) {
@@ -295,17 +300,22 @@ async function sendEmail(email, message) {
   if (!response.ok) throw new Error(`Resend HTTP ${response.status}`);
 }
 
-async function dispatchNotifications(client, message) {
+async function dispatchNotifications(client, message, sendPush, onlyChannel = null) {
   const jobs = [];
-  if (client.discord_webhook) jobs.push(["discord", () => sendDiscord(client.discord_webhook, message)]);
-  if (client.telegram_chat_id) jobs.push(["telegram", () => sendTelegram(client.telegram_chat_id, message)]);
-  if (client.email) jobs.push(["email", () => sendEmail(client.email, message)]);
+  if ((!onlyChannel || onlyChannel === "discord") && client.discord_webhook) jobs.push(["discord", () => sendDiscord(client.discord_webhook, message)]);
+  if ((!onlyChannel || onlyChannel === "telegram") && client.telegram_chat_id) jobs.push(["telegram", () => sendTelegram(client.telegram_chat_id, message)]);
+  if ((!onlyChannel || onlyChannel === "email") && client.email) jobs.push(["email", () => sendEmail(client.email, message)]);
+  if ((!onlyChannel || onlyChannel === "webpush") && client.user_id && typeof sendPush === "function") jobs.push(["webpush", () => sendPush(client.user_id, message)]);
   const settled = await Promise.allSettled(jobs.map(([, send]) => send()));
-  return settled.map((result, index) => ({
-    channel: jobs[index][0],
-    success: result.status === "fulfilled",
-    error: result.status === "rejected" ? String(result.reason?.message || result.reason) : null
-  }));
+  return settled.flatMap((result, index) => {
+    const channel = jobs[index][0];
+    if (channel === "webpush" && result.status === "fulfilled") return Array.isArray(result.value) ? result.value : [];
+    return [{
+      channel,
+      success: result.status === "fulfilled",
+      error: result.status === "rejected" ? String(result.reason?.message || result.reason) : null
+    }];
+  });
 }
 
 export async function sendCloudAlertTest(publicId, secret) {
@@ -331,10 +341,23 @@ async function recordEvent(alert, currentAmount, results) {
   }));
   if (rows.length) {
     await supabaseRequest("alert_events", { method: "POST", body: rows, prefer: "return=minimal" });
+    await Promise.all(results.map((result) => supabaseRequest("service_health?on_conflict=service", {
+      method: "POST",
+      body: { service: `notification-${result.channel}`, status: result.success ? "operational" : "down", message: result.error, checked_at: new Date().toISOString() },
+      prefer: "resolution=merge-duplicates,return=minimal"
+    }).catch(() => {})));
   }
 }
 
-export async function runCloudAlertChecks({ getQuote, concurrency = 4 } = {}) {
+async function queueRetry(jobType, payload, error) {
+  await supabaseRequest("retry_jobs", {
+    method: "POST",
+    body: { job_type: jobType, payload, last_error: String(error || "").slice(0, 500), next_attempt_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() },
+    prefer: "return=minimal"
+  }).catch(() => {});
+}
+
+export async function runCloudAlertChecks({ getQuote, onQuote, sendPush, concurrency = 4 } = {}) {
   if (typeof getQuote !== "function") throw new Error("Price provider is required");
   const [alerts, clients] = await Promise.all([
     supabaseRequest(`price_alerts?enabled=eq.true&select=*&order=last_checked_at.asc.nullsfirst&limit=${MAX_ALERTS_PER_RUN}`),
@@ -360,6 +383,7 @@ export async function runCloudAlertChecks({ getQuote, concurrency = 4 } = {}) {
 
         summary.checked += 1;
         const currentAmount = Number(quote.amount);
+        if (typeof onQuote === "function") await onQuote(alert, quote).catch(() => {});
         const previousAmount = alert.current_amount === null ? Number.NaN : Number(alert.current_amount);
         const targetAmount = Number(alert.target_amount);
         const belowTarget = currentAmount <= targetAmount;
@@ -382,8 +406,9 @@ export async function runCloudAlertChecks({ getQuote, concurrency = 4 } = {}) {
           summary.triggered += 1;
           const client = clientMap.get(alert.client_id);
           if (client) {
-            const results = await dispatchNotifications(client, notificationMessage(alert, currentAmount));
+            const results = await dispatchNotifications(client, notificationMessage(alert, currentAmount), sendPush);
             await recordEvent(alert, currentAmount, results);
+            await Promise.all(results.filter((item) => !item.success && item.channel !== "webpush").map((item) => queueRetry("notification", { alertId: alert.id, clientId: alert.client_id, channel: item.channel, priceAmount: currentAmount }, item.error)));
             const sent = results.filter((item) => item.success).length;
             summary.sent += sent;
             summary.failed += results.length - sent;
@@ -411,4 +436,34 @@ export async function runCloudAlertChecks({ getQuote, concurrency = 4 } = {}) {
 
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max((alerts || []).length, 1)) }, worker));
   return { ...summary, total: (alerts || []).length, partial: (alerts || []).length === MAX_ALERTS_PER_RUN, checkedAt: new Date().toISOString() };
+}
+
+export async function runRetryQueue({ sendPush } = {}) {
+  const now = new Date().toISOString();
+  const jobs = await supabaseRequest(`retry_jobs?status=in.(pending,failed)&attempts=lt.5&next_attempt_at=lte.${encodeURIComponent(now)}&select=*&order=next_attempt_at.asc&limit=30`);
+  const summary = { processed: 0, completed: 0, failed: 0 };
+  for (const job of jobs || []) {
+    summary.processed += 1;
+    const attempts = Number(job.attempts || 0) + 1;
+    await supabaseRequest(`retry_jobs?id=eq.${job.id}`, { method: "PATCH", body: { status: "processing", attempts, updated_at: now }, prefer: "return=minimal" });
+    try {
+      if (job.job_type !== "notification") throw new Error(`Unsupported retry job: ${job.job_type}`);
+      const [alerts, clients] = await Promise.all([
+        supabaseRequest(`price_alerts?id=eq.${job.payload.alertId}&select=*&limit=1`),
+        supabaseRequest(`alert_clients?id=eq.${job.payload.clientId}&select=*&limit=1`)
+      ]);
+      const alert = alerts?.[0];
+      const client = clients?.[0];
+      if (!alert || !client) throw new Error("Alert or client no longer exists");
+      const results = await dispatchNotifications(client, notificationMessage(alert, Number(job.payload.priceAmount)), sendPush, job.payload.channel);
+      await recordEvent(alert, Number(job.payload.priceAmount), results);
+      if (!results.some((item) => item.success)) throw new Error(results.map((item) => item.error).filter(Boolean).join("; ") || "No active channel");
+      await supabaseRequest(`retry_jobs?id=eq.${job.id}`, { method: "PATCH", body: { status: "done", last_error: null, updated_at: new Date().toISOString() }, prefer: "return=minimal" });
+      summary.completed += 1;
+    } catch (error) {
+      await supabaseRequest(`retry_jobs?id=eq.${job.id}`, { method: "PATCH", body: { status: "failed", last_error: String(error.message || error).slice(0, 500), next_attempt_at: new Date(Date.now() + Math.min(24 * 60, 15 * 2 ** attempts) * 60000).toISOString(), updated_at: new Date().toISOString() }, prefer: "return=minimal" }).catch(() => {});
+      summary.failed += 1;
+    }
+  }
+  return summary;
 }
