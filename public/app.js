@@ -472,27 +472,48 @@ async function fetchPublisherHeatmap() {
     const res = await fetch("/api/publishers/heatmap");
     const data = await res.json().catch(() => ({}));
     const publishers = data.publishers || [];
-    grid.innerHTML = publishers.map((pub) => `
-      <div class="publisher-card">
-        <div class="publisher-card-head">
-          <h4>${pub.name}</h4>
-          <span class="publisher-badge">-${pub.avgDiscount}% TB</span>
+    grid.innerHTML = publishers.map((pub) => {
+      const adviceClass = pub.avgDiscount >= 70 ? "advice-buy-now" : pub.avgDiscount >= 60 ? "advice-good-deal" : "advice-wait";
+      const adviceText = pub.avgDiscount >= 70 ? "🔥 NÊN MUA NGAY" : pub.avgDiscount >= 60 ? "✅ MỨC GIÁ TỐT" : "⏳ NÊN ĐỢI SALE LỚN";
+      return `
+        <div class="publisher-card">
+          <div class="publisher-card-head">
+            <h4>${pub.name}</h4>
+            <span class="publisher-badge">-${pub.avgDiscount}% TB</span>
+          </div>
+          <p><strong>Tần suất:</strong> ${pub.frequency}</p>
+          <p><strong>Chu kỳ Sale:</strong> ${pub.pattern}</p>
+          <p style="margin-top: 6px; font-style: italic; color: var(--text-muted);">${pub.recommendation}</p>
+          <div class="purchase-advice-badge ${adviceClass}">
+            ${adviceText}
+          </div>
+          <div class="publisher-tags">
+            ${pub.peakMonths.map((m) => `<span class="publisher-tag">🔥 ${m}</span>`).join("")}
+          </div>
         </div>
-        <p><strong>Tần suất:</strong> ${pub.frequency}</p>
-        <p><strong>Chu kỳ Sale:</strong> ${pub.pattern}</p>
-        <p style="margin-top: 8px; font-style: italic; color: var(--text-muted);">${pub.recommendation}</p>
-        <div class="publisher-tags">
-          ${pub.peakMonths.map((m) => `<span class="publisher-tag">🔥 ${m}</span>`).join("")}
-        </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
   } catch (error) {
     console.error("Heatmap Fetch Error:", error);
   }
 }
 
+function setupHotkeyListeners() {
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey && e.key.toLowerCase() === "k") || (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName))) {
+      e.preventDefault();
+      const searchInput = document.getElementById("searchInput");
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+  });
+}
+
 async function init() {
   initThemeToggle();
+  setupHotkeyListeners();
   applyI18n();
   setupEvents();
   setupDealsEvents();
