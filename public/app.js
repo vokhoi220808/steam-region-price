@@ -487,6 +487,7 @@ async function init() {
   setupCurrencyDropdown();
   initBudgetComboModal();
   initCoopWishlistModal();
+  initGameHelperModal();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -2317,9 +2318,8 @@ async function renderRealHistoryChart(months = 12) {
     });
     
   } catch (err) {
-    console.error(err);
-    loadingIndicator.innerHTML = `<div style="color:var(--danger)">${state.lang === 'vi' ? 'Không có dữ liệu cho tựa game này.' : 'No data available for this game.'}</div>`;
-    lowSummary?.classList.add("hidden");
+    console.error("Real history ITAD error, falling back to simulated history:", err);
+    return renderSimulatedHistoryChart(months);
   }
 }
 
@@ -2688,4 +2688,42 @@ function setupGameExtraTools(appId) {
       bundleResult.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Game này chưa có gói Bundle ưu đãi bổ sung.</div>`;
     }
   }
+}
+
+// GAME HELPER MODAL: PC Specs & Bundle Savings (separate dedicated modal)
+function initGameHelperModal() {
+  const openBtn = document.getElementById("openGameHelperBtn");
+  const modal = document.getElementById("gameHelperModal");
+  const closeBtn = document.getElementById("closeGameHelperModal");
+
+  if (!openBtn || !modal) return;
+
+  openBtn.addEventListener("click", () => {
+    const appId = state.currentData?.appId;
+    if (!appId) return;
+    // Show modal
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+    // Wire up tools for this specific game
+    setupGameExtraTools(appId);
+  });
+
+  closeBtn?.addEventListener("click", () => {
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.add("hidden");
+      modal.style.display = "none";
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+      modal.classList.add("hidden");
+      modal.style.display = "none";
+    }
+  });
 }

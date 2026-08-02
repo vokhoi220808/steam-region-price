@@ -334,6 +334,7 @@
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                 </button>
                 <a href="#" id="gameSteamLinkBtn" target="_blank" class="btn btn-secondary btn-small" data-i18n="open_steam">Mở trên Steam</a>
+                <button type="button" class="btn btn-secondary btn-small" id="openGameHelperBtn" style="font-weight: 600;">🎮 Cấu hình & Bundle</button>
                 <button type="button" class="btn btn-outline btn-small icon-only" id="viewHistoryBtn" title="Xem lịch sử giá" aria-label="Xem lịch sử giá" aria-haspopup="dialog" aria-controls="historyModal">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
                 </button>
@@ -758,40 +759,47 @@
       </div>
       <p class="history-note-real" data-i18n="history_note_real" style="margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center;">* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại.</p>
       <p class="history-note-simulated hidden">Dữ liệu mô phỏng từ mức giá hiện tại, chỉ dùng để xem thử xu hướng và không phải lịch sử giá Steam.</p>
+    </div>
+  </div>
 
-      <!-- REALTIME HARDWARE MATCH & SMART BUNDLE SAVINGS CONTAINER -->
-      <div id="gameExtraRealtimeTools" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="display: flex; gap: 10px; margin-bottom: 14px;">
-          <button id="tabPcSpecsBtn" class="btn btn-secondary btn-small active" style="flex: 1;">🖥️ Kiểm tra Cấu hình PC</button>
-          <button id="tabBundleSavingsBtn" class="btn btn-secondary btn-small" style="flex: 1;">📦 Tiết kiệm Bundle & DLC</button>
+  <!-- GAME HELPER MODAL (PC Specs & Bundle Savings) -->
+  <div id="gameHelperModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 580px; padding: 24px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">🎮 Trợ Lý Game: Cấu Hình & Bundle</h3>
+        <button id="closeGameHelperModal" class="btn icon-only" style="font-size: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <button id="tabPcSpecsBtn" class="btn btn-secondary btn-small active" style="flex: 1; font-weight: 600;">🖥️ Kiểm tra Cấu hình PC</button>
+        <button id="tabBundleSavingsBtn" class="btn btn-secondary btn-small" style="flex: 1; font-weight: 600;">📦 Tiết kiệm Bundle & DLC</button>
+      </div>
+      
+      <!-- PC Specs Tab -->
+      <div id="pcSpecsTabContent">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
+          <select id="userGpuSelect" style="height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+            <option value="rtx3060">GPU: RTX 3060 / RX 6600 (Tốt)</option>
+            <option value="gtx1650">GPU: GTX 1650 / RX 570 (Trung bình)</option>
+            <option value="gtx1050ti">GPU: GTX 1050 Ti (Tối thiểu)</option>
+            <option value="rtx4070">GPU: RTX 4070 / RX 7800 (Cao cấp)</option>
+            <option value="igpu">GPU: Intel Iris / Vega iGPU (Yếu)</option>
+          </select>
+          <select id="userRamSelect" style="height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+            <option value="16">RAM: 16 GB</option>
+            <option value="8">RAM: 8 GB</option>
+            <option value="32">RAM: 32 GB</option>
+          </select>
         </div>
-        
-        <!-- PC Specs Tab -->
-        <div id="pcSpecsTabContent">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
-            <select id="userGpuSelect" style="height: 36px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
-              <option value="rtx3060">GPU: RTX 3060 / RX 6600 (Tốt)</option>
-              <option value="gtx1650">GPU: GTX 1650 / RX 570 (Trung bình)</option>
-              <option value="gtx1050ti">GPU: GTX 1050 Ti (Tối thiểu)</option>
-              <option value="rtx4070">GPU: RTX 4070 / RX 7800 (Cao cấp)</option>
-              <option value="igpu">GPU: Intel Iris / Vega iGPU (Yếu)</option>
-            </select>
-            <select id="userRamSelect" style="height: 36px; padding: 0 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
-              <option value="16">RAM: 16 GB</option>
-              <option value="8">RAM: 8 GB</option>
-              <option value="32">RAM: 32 GB</option>
-            </select>
-          </div>
-          <div id="pcHardwareAssessment" style="padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
-            Đang bóc tách yêu cầu phần cứng từ Steam...
-          </div>
+        <div id="pcHardwareAssessment" style="padding: 14px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+          Đang bóc tách yêu cầu phần cứng từ Steam API...
         </div>
-        
-        <!-- Bundle Tab -->
-        <div id="bundleSavingsTabContent" class="hidden">
-          <div id="bundleSavingsResult" style="padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
-            Đang quét thông tin gói Package & DLC từ Steam...
-          </div>
+      </div>
+      
+      <!-- Bundle Tab -->
+      <div id="bundleSavingsTabContent" class="hidden">
+        <div id="bundleSavingsResult" style="padding: 14px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+          Đang quét thông tin gói Package & DLC từ Steam API...
         </div>
       </div>
     </div>
