@@ -502,7 +502,22 @@ function renderPublisherCards(publishers) {
   }).join("");
 }
 
+function initPublisherHeatmapToggle() {
+  const header = document.getElementById("togglePublisherHeatmapHeader");
+  const grid = document.getElementById("publisherHeatmapGrid");
+  const btn = document.getElementById("togglePublisherHeatmapBtn");
+  const badge = document.getElementById("publisherHeatmapToggleBadge");
+  if (!header || !grid) return;
+
+  header.addEventListener("click", () => {
+    const isHidden = grid.classList.toggle("hidden");
+    if (btn) btn.textContent = isHidden ? "Xem 8 NPH ▾" : "Thu gọn ▴";
+    if (badge) badge.textContent = isHidden ? "Click để xem ▾" : "Thu gọn ▴";
+  });
+}
+
 async function fetchPublisherHeatmap() {
+  initPublisherHeatmapToggle();
   renderPublisherCards(defaultPublisherData);
   try {
     const res = await fetch("/api/publishers/heatmap");
