@@ -2853,8 +2853,10 @@ function initBudgetComboModal() {
     const seen = new Set();
     const pool = rawPool.filter(item => {
       const id = item.id || item.appId;
-      const price = Number(item.final_price || item.finalPrice || (item.price && item.price.final) || 0);
+      const rawPrice = Number(item.final_price || item.finalPrice || (item.price && item.price.final) || 0);
+      const price = rawPrice / 100;
       if (!id || seen.has(id) || price <= 0) return false;
+      item._calcPrice = price;
       seen.add(id);
       return true;
     });
@@ -2871,14 +2873,14 @@ function initBudgetComboModal() {
 
     for (let i = 0; i < subPool.length; i++) {
       for (let j = i + 1; j < subPool.length; j++) {
-        const p1 = Number(subPool[i].final_price || subPool[i].finalPrice || (subPool[i].price && subPool[i].price.final) || 0);
-        const p2 = Number(subPool[j].final_price || subPool[j].finalPrice || (subPool[j].price && subPool[j].price.final) || 0);
+        const p1 = subPool[i]._calcPrice;
+        const p2 = subPool[j]._calcPrice;
         const total2 = p1 + p2;
         if (total2 <= budget && total2 >= budget * 0.6) {
           combos.push({ items: [subPool[i], subPool[j]], totalPrice: total2 });
         }
         for (let k = j + 1; k < subPool.length; k++) {
-          const p3 = Number(subPool[k].final_price || subPool[k].finalPrice || (subPool[k].price && subPool[k].price.final) || 0);
+          const p3 = subPool[k]._calcPrice;
           const total3 = total2 + p3;
           if (total3 <= budget && total3 >= budget * 0.7) {
             combos.push({ items: [subPool[i], subPool[j], subPool[k]], totalPrice: total3 });
