@@ -107,66 +107,45 @@ function accountView(account) {
 }
 
 export async function getWishlist(steamId) {
-  const all = [];
-  for (let page = 0; page < 20; page += 1) {
-    let response = null;
-    let retries = 2;
-    let lastError = null;
-
-    while (retries >= 0 && !response) {
-      try {
-        response = await fetch(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=${page}`, {
-          headers: { Accept: "application/json", "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
-          signal: AbortSignal.timeout(15000)
-        });
-      } catch (err) {
-        lastError = err;
-        retries--;
-        if (retries < 0) {
-          if (err.name === 'TimeoutError' || err.name === 'AbortError' || err.message.includes('timeout')) {
-            throw new Error("Quá thời gian kết nối tới Steam (Timeout). Vui lòng thử lại sau.");
-          }
-          throw err;
-        }
-        await new Promise(r => setTimeout(r, 1000));
+  // Steam's old /wishlistdata/ now returns HTML. Use the new IWishlistService API.
+  let response;
+  try {
+    response = await fetch(
+      `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${steamId}&count=5000`,
+      {
+        headers: { Accept: "application/json", "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
+        signal: AbortSignal.timeout(20000)
       }
+    );
+  } catch (err) {
+    if (err.name === "TimeoutError" || err.name === "AbortError") {
+      throw new Error("Quá thời gian kết nối tới Steam (Timeout). Vui lòng thử lại sau.");
     }
-    if (!response.ok) {
-      if (response.status === 403 || response.status === 404 || response.status === 302) {
-        throw new Error("Wishlist Steam đang để riêng tư hoặc không tồn tại.");
-      }
-      throw new Error(`Steam wishlist HTTP ${response.status}`);
-    }
-    
-    let pageData;
-    try {
-      pageData = await response.json();
-    } catch (err) {
-      break; // Not JSON (probably rate limited or Steam error page)
-    }
-
-    if (pageData && pageData.success === 2) {
-      throw new Error("Wishlist Steam đang để riêng tư (Steam trả về success: 2).");
-    }
-
-    const entries = Object.entries(pageData || {});
-    if (!entries.length) break;
-    
-    for (const [appIdStr, item] of entries) {
-      const appId = Number(appIdStr);
-      if (Number.isInteger(appId) && appId > 0) {
-        all.push({ 
-          appId, 
-          priority: Number(item.priority || 0), 
-          addedAt: item.added ? new Date(item.added * 1000).toISOString() : null, 
-          metadata: item 
-        });
-      }
-    }
-    
-    if (entries.length < 100) break;
+    throw err;
   }
-  return all;
+
+  if (!response.ok) {
+    throw new Error(
+      response.status === 403 || response.status === 404
+        ? "Wishlist Steam đang để riêng tư hoặc không tồn tại."
+        : `Steam wishlist HTTP ${response.status}`
+    );
+  }
+
+  let json;
+  try { json = await response.json(); } catch { return []; }
+
+  const items = json?.response?.items;
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map(item => ({
+      appId: Number(item.appid),
+      priority: Number(item.priority || 0),
+      addedAt: item.date_added ? new Date(item.date_added * 1000).toISOString() : null,
+      metadata: item   // Note: new API has minimal metadata (no name/tags/price)
+    }))
+    .filter(item => Number.isInteger(item.appId) && item.appId > 0);
 }
 
 export async function getPlayerSummaries(steamIds) {

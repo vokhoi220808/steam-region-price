@@ -1070,40 +1070,55 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
       return res.status(400).json({ error: "Cần ít nhất 2 tài khoản có Wishlist công khai.", details: errors });
     }
     const counts = new Map();
-    const metaMap = new Map();
     for (const w of wishlists) {
       const seen = new Set();
       for (const item of w.items) {
         if (!seen.has(item.appId)) {
           seen.add(item.appId);
           counts.set(item.appId, (counts.get(item.appId) || 0) + 1);
-          if (item.metadata && !metaMap.has(item.appId)) metaMap.set(item.appId, item.metadata);
         }
       }
     }
-    const matches = [];
+
+    // Collect matched appIds (appear in 2+ wishlists)
+    const matchedAppIds = [];
     for (const [appId, count] of counts.entries()) {
-      if (count >= 2) {
-        const meta = metaMap.get(appId) || {};
-        const tags = meta.tags || [];
-        const isCoop = tags.some(t => ["Co-op", "Multiplayer", "Online Co-Op", "Local Co-Op"].includes(String(t)));
-        matches.push({
-          appId,
-          matchCount: count,
-          totalUsers: wishlists.length,
-          name: meta.name || `App ${appId}`,
-          banner: meta.capsule || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
-          discountPercent: meta.discount_pct || 0,
-          priceAmount: meta.subs?.[0]?.price || null,
-          isFree: Boolean(meta.is_free_game),
-          type: meta.type || "game",
-          tags: tags,
-          isCoop: isCoop
-        });
-      }
+      if (count >= 2) matchedAppIds.push({ appId, count });
     }
-    
-    // Sort matches: Co-op first, then highest matches, then highest discount
+
+    // Fetch game details from Steam Store API for all matched games
+    const cc = req.query.cc || 'vn';
+    const gameDetails = await Promise.allSettled(
+      matchedAppIds.map(({ appId }) =>
+        fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=basic,price_overview,categories,genres`, {
+          headers: { "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
+          signal: AbortSignal.timeout(8000)
+        }).then(r => r.json()).catch(() => null)
+      )
+    );
+
+    const matches = matchedAppIds.map(({ appId, count }, idx) => {
+      const settled = gameDetails[idx];
+      const gameData = settled.status === "fulfilled" ? settled.value?.[String(appId)]?.data : null;
+      const cats = (gameData?.categories || []).map(c => c.description || "");
+      const isCoop = cats.some(c => ["Multi-player","Co-op","Online Co-op","Local Co-op"].includes(c));
+      const priceOverview = gameData?.price_overview;
+      return {
+        appId,
+        matchCount: count,
+        totalUsers: wishlists.length,
+        name: gameData?.name || `App ${appId}`,
+        banner: gameData?.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+        discountPercent: priceOverview?.discount_percent || 0,
+        priceAmount: priceOverview?.final || null,
+        priceCurrency: priceOverview?.currency || cc.toUpperCase(),
+        isFree: Boolean(gameData?.is_free),
+        type: gameData?.type || "game",
+        isCoop
+      };
+    });
+
+    // Sort: Co-op first → highest match count → highest discount
     matches.sort((a, b) => {
       if (a.isCoop !== b.isCoop) return a.isCoop ? -1 : 1;
       if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
