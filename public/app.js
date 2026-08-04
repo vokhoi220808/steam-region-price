@@ -3039,38 +3039,53 @@ function initCoopWishlistModal() {
         return;
       }
 
-      results.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; background:var(--bg-primary); padding:10px; border-radius:8px;">
-          <span style="font-size:12px; color:var(--text-muted);">Tổ đội:</span>
-          ${data.players && data.players.length ? data.players.map(p => `
+      const playerBadges = data.players && data.players.length
+        ? data.players.map(p => `
             <div style="display:flex; align-items:center; gap:6px; background:var(--surface-elevated); padding:4px 8px; border-radius:20px;">
-              <img src="${p.avatar}" style="width:20px; height:20px; border-radius:50%;">
+              <img src="${p.avatar}" style="width:20px; height:20px; border-radius:50%;" onerror="this.style.display='none'">
               <span style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.personaname}</span>
-            </div>
-          `).join("") : '<span style="font-size:12px; color:var(--text-muted);">${data.totalAnalyzed} thành viên</span>'}
-        </div>
-        <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">Tìm thấy <strong>${data.matchedCount}</strong> game xuất hiện chung trong Wishlist:</div>
-        ${data.matches.map(m => `
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px;">
+            </div>`).join("")
+        : `<span style="font-size:12px; color:var(--text-muted);">${data.totalAnalyzed} thành viên</span>`;
+
+      const matchCards = data.matches.map(m => {
+        const pricePerPerson = m.priceAmount ? (m.priceAmount / 100).toLocaleString('vi-VN') : null;
+        const totalBill = m.priceAmount ? (m.priceAmount * m.matchCount / 100).toLocaleString('vi-VN') : null;
+        const currency = m.priceCurrency || 'VND';
+        const currencySymbol = currency === 'USD' ? '$' : (currency === 'EUR' ? '€' : '₫');
+        const displayPrice = m.priceAmount
+          ? `${currencySymbol}${(m.priceAmount/100).toLocaleString('vi-VN')}`
+          : (m.isFree ? 'Miễn phí' : 'Chưa có giá');
+
+        return `
+          <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--primary)';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
             <div style="display:flex; align-items:center; gap:12px;">
-              <img src="${m.banner}" style="width:90px; height:42px; object-fit:cover; border-radius:4px;">
+              <img src="${m.banner}" style="width:100px; height:46px; object-fit:cover; border-radius:6px;" onerror="this.src='https://cdn.akamai.steamstatic.com/steam/apps/${m.appId}/header.jpg'">
               <div>
-                <div style="font-weight:600; font-size:14px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                <div style="font-weight:700; font-size:14px; color:var(--text-primary); display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                   ${m.name}
-                  ${m.isCoop ? `<span style="font-size:10px; background:var(--success); color:#fff; padding:2px 4px; border-radius:4px; line-height:1;">🔥 Co-op</span>` : ''}
+                  ${m.isCoop ? `<span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:10px; font-weight:600;">🎮 Co-op</span>` : ''}
                 </div>
-                <div style="margin-top:4px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                  <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 6px; border-radius:10px;">Trùng ${m.matchCount}/${m.totalUsers} người</span>
-                  ${m.priceAmount ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">~ ${(m.priceAmount / 100).toLocaleString('vi-VN')}đ/người</span>` : (m.isFree ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">Miễn phí</span>` : '')}
+                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                  <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 8px; border-radius:10px; font-weight:600;">👥 Trùng ${m.matchCount}/${m.totalUsers} người</span>
+                  ${pricePerPerson ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">~${pricePerPerson}đ/người</span>` : ''}
+                  ${m.discountPercent > 0 ? `<span style="font-size:11px; background:var(--error); color:#fff; padding:2px 6px; border-radius:10px; font-weight:700;">-${m.discountPercent}%</span>` : ''}
                 </div>
               </div>
             </div>
-            <div style="text-align:right;">
-              ${m.discountPercent > 0 ? `<div style="font-weight:700; color:var(--success); font-size:14px;">-${m.discountPercent}%</div>` : ''}
-              ${m.priceAmount ? `<div style="font-size:11px; color:var(--text-primary); font-weight:600; margin-top:4px;">Tổng bill: ${(m.priceAmount * m.matchCount / 100).toLocaleString('vi-VN')}đ</div>` : ''}
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-weight:700; color:var(--success); font-size:15px;">${displayPrice}</div>
+              ${totalBill ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Tổng ${totalBill}đ</div>` : ''}
             </div>
-          </div>
-        `).join("")}
+          </a>`;
+      }).join("");
+
+      results.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; background:var(--bg-primary); padding:10px; border-radius:8px;">
+          <span style="font-size:12px; color:var(--text-muted);">Tổ đội:</span>
+          ${playerBadges}
+        </div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Tìm thấy <strong style="color:var(--text-primary);">${data.matchedCount}</strong> game xuất hiện chung trong Wishlist:</div>
+        ${matchCards}
       `;
     } catch (err) {
       results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">${err.message}</div>`;
