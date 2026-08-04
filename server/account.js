@@ -109,10 +109,28 @@ function accountView(account) {
 export async function getWishlist(steamId) {
   const all = [];
   for (let page = 0; page < 20; page += 1) {
-    const response = await fetch(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=${page}`, {
-      headers: { Accept: "application/json", "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
-      signal: AbortSignal.timeout(15000)
-    });
+    let response = null;
+    let retries = 2;
+    let lastError = null;
+
+    while (retries >= 0 && !response) {
+      try {
+        response = await fetch(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=${page}`, {
+          headers: { Accept: "application/json", "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
+          signal: AbortSignal.timeout(15000)
+        });
+      } catch (err) {
+        lastError = err;
+        retries--;
+        if (retries < 0) {
+          if (err.name === 'TimeoutError' || err.name === 'AbortError' || err.message.includes('timeout')) {
+            throw new Error("Quá thời gian kết nối tới Steam (Timeout). Vui lòng thử lại sau.");
+          }
+          throw err;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
     if (!response.ok) {
       if (response.status === 403 || response.status === 404 || response.status === 302) {
         throw new Error("Wishlist Steam đang để riêng tư hoặc không tồn tại.");

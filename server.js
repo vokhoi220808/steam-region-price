@@ -1022,6 +1022,7 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
     const rawInput = String(req.query.steamIds || '');
     const tokens = rawInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
     const steamIds = [];
+    const errors = [];
 
     for (const raw of tokens) {
       const match17 = raw.match(/(\d{17})/);
@@ -1032,21 +1033,35 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
         const vanityName = vanityMatch[1]?.replace(/[^a-zA-Z0-9_-]/g, "");
         if (vanityName) {
           try {
-            const xmlRes = await fetch(`https://steamcommunity.com/id/${vanityName}/?xml=1`, { signal: AbortSignal.timeout(6000) });
+            const xmlRes = await fetch(`https://steamcommunity.com/id/${vanityName}/?xml=1`, { signal: AbortSignal.timeout(10000) });
             const xmlText = await xmlRes.text();
             const idMatch = xmlText.match(/<steamID64>(\d{17})<\/steamID64>/);
-            if (idMatch) steamIds.push(idMatch[1]);
-          } catch (e) {}
+            if (idMatch) {
+              steamIds.push(idMatch[1]);
+            } else {
+              errors.push({ steamId: raw, error: "Không tìm thấy Steam ID64 từ link Profile." });
+            }
+          } catch (e) {
+            errors.push({ steamId: raw, error: "Lỗi kết nối khi phân tích link Profile (Timeout)." });
+          }
+        } else {
+          errors.push({ steamId: raw, error: "Định dạng ID hoặc link không hợp lệ." });
         }
       }
     }
 
-    if (steamIds.length < 2) {
-      return res.status(400).json({ error: "Cần ít nhất 2 Steam ID (17 chữ số) hoặc Link Profile công khai để so sánh." });
+    if (steamIds.length < 2 && wishlists?.length === undefined) { // basic check before fetch
+       if (errors.length > 0 && steamIds.length < 2) {
+         return res.status(400).json({ error: "Cần ít nhất 2 tài khoản hợp lệ để bắt đầu so sánh.", details: errors });
+       }
+       if (steamIds.length < 2) {
+         return res.status(400).json({ error: "Cần ít nhất 2 Steam ID (17 chữ số) hoặc Link Profile công khai để so sánh." });
+       }
     }
+
     const results = await Promise.allSettled(steamIds.map((id) => getWishlist(id)));
     const wishlists = [];
-    const errors = [];
+    
     results.forEach((r, idx) => {
       if (r.status === "fulfilled") wishlists.push({ steamId: steamIds[idx], items: r.value });
       else errors.push({ steamId: steamIds[idx], error: r.reason?.message || "Không thể lấy Wishlist" });
