@@ -483,6 +483,8 @@ async function init() {
   setupHotkeyListeners();
   applyI18n();
   setupEvents();
+  renderRegions();
+  updateRegionSummary();
   setupDealsEvents();
   setupCurrencyDropdown();
   initBudgetComboModal();

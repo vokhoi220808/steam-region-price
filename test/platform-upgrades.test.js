@@ -110,6 +110,7 @@ test("cyber glass UX exposes smart search, price intelligence and watchlist draw
   assert.match(styles, /cubic-bezier\(\.16,1,\.3,1\)/);
   assert.match(client, /updateSpotlightIntelligence/);
   assert.match(client, /renderWatchlistDrawer/);
+  assert.match(client, /setupEvents\(\);\s*renderRegions\(\);\s*updateRegionSummary\(\);/);
   assert.match(server, /reviewPercent/);
   assert.match(schema, /alertEnabled:\s*true/);
   assert.match(alertSettings, /game\.alertEnabled !== false/);
