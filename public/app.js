@@ -513,6 +513,7 @@ async function init() {
   setupCurrencyDropdown();
   initBudgetComboModal();
   initCoopWishlistModal();
+  initRealCostModal();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -2887,6 +2888,74 @@ function initCoopWishlistModal() {
     } catch (err) {
       results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">${err.message}</div>`;
     }
+  });
+}
+
+// 3. REAL-COST SAVINGS CALCULATOR
+function initRealCostModal() {
+  const modal = document.getElementById("realCostModal");
+  const openBtn = document.getElementById("openRealCostBtn");
+  const closeBtn = document.getElementById("closeRealCostModal");
+  const baseInput = document.getElementById("realCostBasePrice");
+  const bankFeeInput = document.getElementById("realCostBankFeePct");
+  const fixedFeeInput = document.getElementById("realCostFixedFee");
+  const fxBufferInput = document.getElementById("realCostFxBuffer");
+  const results = document.getElementById("realCostResults");
+
+  if (!modal || !openBtn) return;
+
+  function calculate() {
+    const base = Number(baseInput?.value || 0);
+    const feePct = Number(bankFeeInput?.value || 0);
+    const fixedFee = Number(fixedFeeInput?.value || 0);
+    const bufferPct = Number(fxBufferInput?.value || 0);
+
+    if (base <= 0) {
+      results.innerHTML = `<div style="color:var(--text-muted); text-align:center;">Vui lòng nhập giá niêm yết hợp lệ.</div>`;
+      return;
+    }
+
+    const feeAmount = base * (feePct / 100);
+    const bufferAmount = base * (bufferPct / 100);
+    const realTotal = base + feeAmount + fixedFee + bufferAmount;
+    const extraTotal = feeAmount + fixedFee + bufferAmount;
+
+    results.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:13px; color:var(--text-secondary);">Giá niêm yết ban đầu:</span>
+        <strong style="font-size:14px; color:var(--text-primary);">${base.toLocaleString("vi-VN")}₫</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; color:var(--text-muted);">
+        <span>+ Phí thẻ quốc tế (${feePct}%):</span>
+        <span>+${Math.round(feeAmount).toLocaleString("vi-VN")}₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; color:var(--text-muted);">
+        <span>+ Phí cố định ngân hàng:</span>
+        <span>+${fixedFee.toLocaleString("vi-VN")}₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:12px; color:var(--text-muted);">
+        <span>+ Dự phòng biến động tỷ giá (${bufferPct}%):</span>
+        <span>+${Math.round(bufferAmount).toLocaleString("vi-VN")}₫</span>
+      </div>
+      <div style="border-top:1px dashed var(--border); padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:15px; color:#f59e0b;">TỔNG THỰC TRẢ TÍNH TOÁN:</strong>
+        <strong style="font-size:18px; color:var(--primary);">${Math.round(realTotal).toLocaleString("vi-VN")}₫</strong>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:8px; text-align:right;">
+        (Phụ phí phát sinh ước tính: +${Math.round(extraTotal).toLocaleString("vi-VN")}₫)
+      </div>
+    `;
+  }
+
+  openBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+    calculate();
+  });
+  closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  [baseInput, bankFeeInput, fixedFeeInput, fxBufferInput].forEach(el => {
+    el?.addEventListener("input", calculate);
   });
 }
 

@@ -102,15 +102,48 @@ export async function runTrackedHistorySweep({ getQuote, concurrency = 4 } = {})
 
 
 
-export function getPurchaseAdvice({ currentPrice, originalPrice, discountPercent, stats } = {}) {
+export function getPurchaseAdvice({ currentPrice, originalPrice, discountPercent, stats, checkedAt = null } = {}) {
   const discount = Number(discountPercent || 0);
   const isHistoricalLow = stats?.historicalLow !== null && currentPrice !== null && Number(currentPrice) <= Number(stats?.historicalLow) * 1.02;
 
+  let confidenceScore = 95;
+  if (checkedAt) {
+    const ageMinutes = (Date.now() - new Date(checkedAt).getTime()) / 60000;
+    if (ageMinutes > 720) confidenceScore -= 20;
+    else if (ageMinutes > 120) confidenceScore -= 10;
+  }
+  if (!stats || !stats.recordedCount || stats.recordedCount < 3) {
+    confidenceScore -= 15;
+  }
+  confidenceScore = Math.max(50, Math.min(99, Math.round(confidenceScore)));
+  const confidenceLabel = confidenceScore >= 85 ? "Cao" : confidenceScore >= 70 ? "Trung bình" : "Thấp";
+
   if (discount >= 70 || isHistoricalLow) {
-    return { action: "BUY_NOW", badge: "🔥 NÊN MUA NGAY", color: "#10b981", reason: isHistoricalLow ? "Giá hiện tại đang ở mốc thấp nhất lịch sử!" : "Game đang có mức giảm giá cực sâu (từ 70% trở lên)." };
+    return {
+      action: "BUY_NOW",
+      badge: "🔥 NÊN MUA NGAY",
+      color: "#10b981",
+      reason: isHistoricalLow ? "Giá hiện tại đang ở mốc thấp nhất lịch sử!" : "Game đang có mức giảm giá cực sâu (từ 70% trở lên).",
+      confidenceScore,
+      confidenceLabel
+    };
   }
   if (discount >= 40) {
-    return { action: "GOOD_DEAL", badge: "✅ MỨC GIÁ TỐT", color: "#3b82f6", reason: "Mức giảm khá tốt. Nếu bạn muốn trải nghiệm ngay thì đây là mức giá hợp lý." };
+    return {
+      action: "GOOD_DEAL",
+      badge: "✅ MỨC GIÁ TỐT",
+      color: "#3b82f6",
+      reason: "Mức giảm khá tốt. Nếu bạn muốn trải nghiệm ngay thì đây là mức giá hợp lý.",
+      confidenceScore,
+      confidenceLabel
+    };
   }
-  return { action: "WAIT_FOR_SALE", badge: "⏳ NÊN ĐỢI SALE LỚN", color: "#f59e0b", reason: "Mức giảm hiện tại chưa sâu. Khuyến nghị đợi đợt Steam Seasonal Sale tiếp theo." };
+  return {
+    action: "WAIT_FOR_SALE",
+    badge: "⏳ NÊN ĐỢI SALE LỚN",
+    color: "#f59e0b",
+    reason: "Mức giảm hiện tại chưa sâu. Khuyến nghị đợi đợt Steam Seasonal Sale tiếp theo.",
+    confidenceScore,
+    confidenceLabel
+  };
 }

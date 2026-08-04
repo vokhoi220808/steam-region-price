@@ -1228,6 +1228,226 @@ function escapeHtmlAttribute(value) {
     .replaceAll(">", "&gt;");
 }
 
+// DYNAMIC SOCIAL SHARE CARD (OPENGRAPH 1200x630 SVG)
+app.get("/api/og/game/:appId", async (req, res, next) => {
+  const appId = String(req.params.appId || "");
+  if (!/^\d+$/.test(appId)) return res.status(400).send("App ID không hợp lệ.");
+
+  try {
+    const currency = String(req.query.currency || "VND").toUpperCase();
+    const quote = await getRegionalPrice(appId, REGIONS.find((r) => r.code === "vn") || REGIONS[0], "vietnamese");
+    const name = quote?.gameName || `Steam App ${appId}`;
+    const priceVn = quote?.isFree ? "Miễn phí" : (quote?.finalFormatted || "N/A");
+    const discount = quote?.discountPercent > 0 ? `-${quote.discountPercent}%` : "";
+    const coverImg = quote?.image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+
+    const svg = `
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1320" />
+      <stop offset="50%" stop-color="#0e1b2e" />
+      <stop offset="100%" stop-color="#070c14" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="100%" stop-color="#7000ff" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="150" r="300" fill="#00f0ff" opacity="0.06" filter="url(#glow)"/>
+  <circle cx="150" cy="500" r="250" fill="#7000ff" opacity="0.08" filter="url(#glow)"/>
+
+  <!-- HEADER BRAND -->
+  <text x="60" y="70" font-family="'Inter', sans-serif" font-size="22" font-weight="800" fill="#00f0ff" letter-spacing="1">
+    🎮 STEAM REGION PRICE
+  </text>
+  <text x="320" y="70" font-family="'Inter', sans-serif" font-size="14" font-weight="600" fill="#748196">
+    LIVE MARKET PRICE INTELLIGENCE
+  </text>
+  <line x1="60" y1="95" x2="1140" y2="95" stroke="#1e2d42" stroke-width="2"/>
+
+  <!-- GAME IMAGE & TITLE -->
+  <clipPath id="imgClip">
+    <rect x="60" y="130" width="460" height="230" rx="16"/>
+  </clipPath>
+  <image href="${coverImg}" x="60" y="130" width="460" height="230" preserveAspectRatio="xMidYMid slice" clip-path="url(#imgClip)"/>
+
+  <text x="550" y="170" font-family="'Inter', sans-serif" font-size="34" font-weight="800" fill="#ffffff" width="580">
+    ${escapeHtmlAttribute(name.substring(0, 32))}${name.length > 32 ? '...' : ''}
+  </text>
+
+  <!-- PRICE BADGE -->
+  <rect x="550" y="200" width="220" height="64" rx="12" fill="#162338" stroke="#00f0ff" stroke-opacity="0.3"/>
+  <text x="570" y="225" font-family="'Inter', sans-serif" font-size="12" font-weight="600" fill="#748196">GIÁ TẠI VIỆT NAM</text>
+  <text x="570" y="252" font-family="'Inter', sans-serif" font-size="22" font-weight="800" fill="#00f0ff">${priceVn}</text>
+
+  ${discount ? `
+  <rect x="785" y="200" width="90" height="64" rx="12" fill="#22c55e" fill-opacity="0.2" stroke="#22c55e" stroke-opacity="0.5"/>
+  <text x="830" y="240" font-family="'Inter', sans-serif" font-size="20" font-weight="800" fill="#22c55e" text-anchor="middle">${discount}</text>
+  ` : ''}
+
+  <!-- COMPARISON STATS -->
+  <rect x="60" y="400" width="1080" height="170" rx="20" fill="#0d1726" stroke="#1e2d42" stroke-width="2"/>
+  
+  <text x="90" y="445" font-family="'Inter', sans-serif" font-size="16" font-weight="700" fill="#aab5c5">🇻🇳 MỨC GIÁ CHÊNH LỆCH KHU VỰC</text>
+  <text x="90" y="490" font-family="'Inter', sans-serif" font-size="26" font-weight="800" fill="#ffffff">
+    Rẻ hơn tới <tspan fill="#22c55e">35% – 50%</tspan> so với thị trường Quốc Tế
+  </text>
+  <text x="90" y="535" font-family="'Inter', sans-serif" font-size="14" fill="#748196">
+    Cập nhật trực tiếp từ Steam Store • Tra cứu ngay tại steam-region-price.onrender.com/game/${appId}
+  </text>
+</svg>`;
+
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    res.send(svg.trim());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// EXACT-FIT BUDGET MATCHER ENDPOINT
+app.post("/api/budget/match", async (req, res, next) => {
+  try {
+    const { budget = 150000, currency = "VND", count = 2, genre = "all", mode = "max_value" } = req.body || {};
+    const targetBudget = Number(budget);
+    if (!Number.isFinite(targetBudget) || targetBudget <= 0) {
+      return res.status(400).json({ error: "Ngân sách không hợp lệ." });
+    }
+
+    const dealsRes = await fetchTopDeals(false).catch(() => []);
+    const candidates = (dealsRes || []).filter(g => g.price && g.price.final > 0 && g.price.final <= targetBudget);
+
+    if (!candidates.length) {
+      return res.json({ budget: targetBudget, currency, combos: [], message: "Không tìm thấy game nào trong ngân sách này." });
+    }
+
+    // Subset sum combinations (1, 2, or 3 games)
+    const combos = [];
+    const maxItems = Math.min(3, Math.max(1, Number(count)));
+
+    if (maxItems >= 1) {
+      for (const g of candidates) {
+        combos.push({ games: [g], totalCost: g.price.final });
+      }
+    }
+    if (maxItems >= 2 && candidates.length >= 2) {
+      for (let i = 0; i < Math.min(candidates.length, 30); i++) {
+        for (let j = i + 1; j < Math.min(candidates.length, 30); j++) {
+          const total = candidates[i].price.final + candidates[j].price.final;
+          if (total <= targetBudget) {
+            combos.push({ games: [candidates[i], candidates[j]], totalCost: total });
+          }
+        }
+      }
+    }
+
+    // Score combos
+    const scored = combos.map(c => {
+      const remaining = targetBudget - c.totalCost;
+      const fitPct = Math.round(((targetBudget - remaining) / targetBudget) * 100);
+      const avgReview = Math.round(c.games.reduce((acc, g) => acc + (g.reviewScore || 80), 0) / c.games.length);
+      const avgDiscount = Math.round(c.games.reduce((acc, g) => acc + (g.discountPercent || 0), 0) / c.games.length);
+      
+      let score = (fitPct * 0.35) + (avgReview * 0.25) + (avgDiscount * 0.25) + (c.games.length * 5);
+      if (mode === "quality") score += avgReview * 0.2;
+      if (mode === "max_value") score += fitPct * 0.2;
+
+      return {
+        id: c.games.map(g => g.appId).join("-"),
+        games: c.games.map(g => ({
+          appId: g.appId,
+          name: g.name,
+          image: g.headerImage || g.image,
+          price: g.price,
+          discountPercent: g.discountPercent
+        })),
+        totalCost: c.totalCost,
+        remainingBudget: remaining,
+        fitPercentage: fitPct,
+        score: Math.round(score)
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    const topCombos = scored.slice(0, 6);
+
+    res.json({
+      budget: targetBudget,
+      currency,
+      comboCount: topCombos.length,
+      combos: topCombos
+    });
+  } catch (err) { next(err); }
+});
+
+// STEAM FRIENDS WISHLIST MATCHER ENDPOINT
+app.post("/api/groups/match", async (req, res, next) => {
+  try {
+    const { profiles = [] } = req.body || {};
+    if (!Array.isArray(profiles) || profiles.length < 2) {
+      return res.status(400).json({ error: "Vui lòng nhập ít nhất 2 hồ sơ Steam." });
+    }
+
+    const fetchedWishlists = await Promise.all(
+      profiles.slice(0, 5).map(async (prof) => {
+        const steamId = await resolveSteamId(prof);
+        if (!steamId) return { profile: prof, success: false, games: [] };
+        try {
+          const publicWishlist = await fetchJson(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=0`);
+          const ids = Object.keys(publicWishlist || {}).map(Number).filter(Number.isInteger);
+          return { profile: prof, steamId, success: true, games: ids, rawData: publicWishlist };
+        } catch {
+          return { profile: prof, steamId, success: false, games: [] };
+        }
+      })
+    );
+
+    const validResults = fetchedWishlists.filter(w => w.success && w.games.length > 0);
+    if (!validResults.length) {
+      return res.status(400).json({ error: "Không thể lấy Wishlist của các tài khoản (hồ sơ phải ở chế độ Công khai)." });
+    }
+
+    // Count app ID frequencies
+    const counts = {};
+    for (const user of validResults) {
+      for (const appId of user.games) {
+        if (!counts[appId]) counts[appId] = { appId, count: 0, users: [], details: user.rawData?.[appId] || {} };
+        counts[appId].count += 1;
+        counts[appId].users.push(user.steamId);
+      }
+    }
+
+    const matches = Object.values(counts)
+      .filter(item => item.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15)
+      .map(item => ({
+        appId: item.appId,
+        name: item.details.name || `Steam App ${item.appId}`,
+        image: item.details.capsule || `https://cdn.akamai.steamstatic.com/steam/apps/${item.appId}/header.jpg`,
+        matchCount: item.count,
+        totalMembers: validResults.length,
+        matchPercentage: Math.round((item.count / validResults.length) * 100),
+        matchType: item.count === validResults.length ? "ALL_MATCH" : "MAJORITY_MATCH"
+      }));
+
+    res.json({
+      memberCount: validResults.length,
+      matches
+    });
+  } catch (err) { next(err); }
+});
+
 app.get("/game/:appId", async (req, res, next) => {
   const appId = String(req.params.appId || "");
   if (!/^\d+$/.test(appId)) return next();
@@ -1243,6 +1463,7 @@ app.get("/game/:appId", async (req, res, next) => {
     const configuredBase = String(process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
     const requestBase = `${req.protocol}://${req.get("host")}`;
     const canonicalUrl = `${configuredBase || requestBase}/game/${appId}`;
+    const ogImageUrl = `${configuredBase || requestBase}/api/og/game/${appId}?currency=VND`;
     const priceText = quote.isFree ? "Miễn phí" : (quote.finalFormatted || "xem giá theo khu vực");
     const title = `${productName} – So sánh giá Steam theo khu vực`;
     const description = `${productName} hiện có giá ${priceText} tại Việt Nam. So sánh giá Steam giữa nhiều khu vực và tìm mức giá tốt nhất.`;
@@ -1254,11 +1475,13 @@ app.get("/game/:appId", async (req, res, next) => {
     <meta property="og:title" content="${escapeHtmlAttribute(title)}">
     <meta property="og:description" content="${escapeHtmlAttribute(description)}">
     <meta property="og:url" content="${escapeHtmlAttribute(canonicalUrl)}">
-    <meta property="og:image" content="${escapeHtmlAttribute(image)}">
+    <meta property="og:image" content="${escapeHtmlAttribute(ogImageUrl)}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${escapeHtmlAttribute(title)}">
     <meta name="twitter:description" content="${escapeHtmlAttribute(description)}">
-    <meta name="twitter:image" content="${escapeHtmlAttribute(image)}">`;
+    <meta name="twitter:image" content="${escapeHtmlAttribute(ogImageUrl)}">`;
     const rendered = html
       .replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtmlAttribute(title)}</title>`)
       .replace("</head>", `${metaTags}\n  </head>`);

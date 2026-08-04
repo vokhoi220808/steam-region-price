@@ -524,6 +524,7 @@
         <div style="display: flex; gap: 8px;">
           <button class="btn btn-secondary btn-small" id="openBudgetComboBtn" style="gap: 6px; font-weight: 600; border-color: rgba(59,130,246,0.4); color: var(--primary);">🎯 Combo Khít Ngân Sách</button>
           <button class="btn btn-secondary btn-small" id="openCoopWishlistBtn" style="gap: 6px; font-weight: 600; border-color: rgba(16,185,129,0.4); color: var(--success);">👥 Match Wishlist Bạn Bè</button>
+          <button class="btn btn-secondary btn-small" id="openRealCostBtn" style="gap: 6px; font-weight: 600; border-color: rgba(245,158,11,0.4); color: #f59e0b;">🧮 Tính Phí Thực Trả</button>
         </div>
       </div>
 
@@ -873,6 +874,38 @@
       </div>
       
       <div id="coopWishlistResults" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    </div>
+  </div>
+
+  <!-- REAL-COST SAVINGS CALCULATOR MODAL -->
+  <div id="realCostModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 600px; padding: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 20px; font-weight: 700; color: #f59e0b;">🧮 Tính Phí Thực Trả Sau Ngân Hàng & Tỷ Giá</h3>
+        <button id="closeRealCostModal" class="btn icon-only" style="font-size: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Tính toán tổng số tiền thực tế bạn phải trả khi mua game bằng thẻ quốc tế (Visa/Mastercard) bao gồm phí giao dịch quốc tế, phí cố định ngân hàng và chênh lệch tỷ giá.</p>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Giá niêm yết (VNĐ):</label>
+          <input type="number" id="realCostBasePrice" value="500000" style="width: 100%; height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text-primary);">
+        </div>
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Phí thẻ quốc tế (%):</label>
+          <input type="number" id="realCostBankFeePct" value="2.5" step="0.1" style="width: 100%; height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text-primary);">
+        </div>
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Phí cố định ngân hàng (VNĐ):</label>
+          <input type="number" id="realCostFixedFee" value="5000" style="width: 100%; height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text-primary);">
+        </div>
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Dự phòng biến động tỷ giá (%):</label>
+          <input type="number" id="realCostFxBuffer" value="1.0" step="0.1" style="width: 100%; height: 38px; padding: 0 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text-primary);">
+        </div>
+      </div>
+      
+      <div id="realCostResults" style="background: rgba(0,240,255,0.05); border: 1px solid rgba(0,240,255,0.2); border-radius: var(--radius-md); padding: 16px; margin-top: 16px;"></div>
     </div>
   </div>
 
