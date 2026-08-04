@@ -3178,11 +3178,11 @@ function initCoopWishlistModal() {
 
       <!-- Action bar: share + chot tat -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="navigator.clipboard.writeText(${JSON.stringify(shareSummary)}).then(()=>{this.textContent='✅ Đã copy!';setTimeout(()=>this.textContent='📋 Chia sẻ kết quả',2000)})"
+        <button id="coopShareBtn"
           style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;font-weight:600;padding:8px;border-radius:8px;cursor:pointer;transition:all 0.2s;"
           onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">📋 Chia sẻ kết quả</button>
-        ${topBuyLinks.length ? `<button onclick="(${JSON.stringify(topBuyLinks)}).forEach((u,i)=>setTimeout(()=>window.open(u,'_blank'),i*300))"
+        ${topBuyLinks.length ? `<button id="coopChotTatBtn"
           style="flex:1;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-size:12px;font-weight:700;padding:8px;border-radius:8px;cursor:pointer;transition:opacity 0.2s;"
           onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🎯 Chốt Tất (Top ${topBuyLinks.length})</button>` : ''}
       </div>
@@ -3190,6 +3190,27 @@ function initCoopWishlistModal() {
       <!-- Game cards -->
       ${matchCards}
     `;
+
+    // Wire up action buttons AFTER innerHTML is set
+    const shareBtn = results.querySelector('#coopShareBtn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(shareSummary).then(() => {
+          shareBtn.textContent = '✅ Đã copy!';
+          setTimeout(() => { shareBtn.textContent = '📋 Chia sẻ kết quả'; }, 2000);
+        }).catch(() => {
+          shareBtn.textContent = '❌ Lỗi copy';
+          setTimeout(() => { shareBtn.textContent = '📋 Chia sẻ kết quả'; }, 2000);
+        });
+      });
+    }
+
+    const chotTatBtn = results.querySelector('#coopChotTatBtn');
+    if (chotTatBtn) {
+      chotTatBtn.addEventListener('click', () => {
+        topBuyLinks.forEach((url, i) => setTimeout(() => window.open(url, '_blank'), i * 350));
+      });
+    }
   }
 
   // Sort bar interaction
