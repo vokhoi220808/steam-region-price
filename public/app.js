@@ -2866,31 +2866,77 @@ function initBudgetComboModal() {
       return;
     }
 
-    // Run Knapsack subset-sum algorithm for combos of 2 to 3 games
+    // Enhanced DFS Knapsack Algorithm for Combos (2 to 5 games)
     const combos = [];
-    const n = Math.min(pool.length, 60);
-    const subPool = pool.slice(0, n);
-
-    for (let i = 0; i < subPool.length; i++) {
-      for (let j = i + 1; j < subPool.length; j++) {
-        const p1 = subPool[i]._calcPrice;
-        const p2 = subPool[j]._calcPrice;
-        const total2 = p1 + p2;
-        if (total2 <= budget && total2 >= budget * 0.6) {
-          combos.push({ items: [subPool[i], subPool[j]], totalPrice: total2 });
+    
+    // Sort pool by price descending for faster DFS bounding
+    pool.sort((a, b) => b._calcPrice - a._calcPrice);
+    const subPool = pool.slice(0, 100); 
+    
+    let iterations = 0;
+    const MAX_ITERATIONS = 50000;
+    
+    function findCombos(minPct, maxItems) {
+      function dfs(startIndex, currentCombo, currentSum) {
+        iterations++;
+        if (iterations > MAX_ITERATIONS || combos.length > 500) return;
+        
+        if (currentCombo.length >= 2 && currentCombo.length <= maxItems) {
+          if (currentSum <= budget && currentSum >= budget * minPct) {
+            combos.push({ 
+              items: [...currentCombo], 
+              totalPrice: currentSum,
+              avgDiscount: currentCombo.reduce((acc, it) => acc + (it.discount_percent||0), 0) / currentCombo.length
+            });
+          }
         }
-        for (let k = j + 1; k < subPool.length; k++) {
-          const p3 = subPool[k]._calcPrice;
-          const total3 = total2 + p3;
-          if (total3 <= budget && total3 >= budget * 0.7) {
-            combos.push({ items: [subPool[i], subPool[j], subPool[k]], totalPrice: total3 });
+        
+        if (currentCombo.length >= maxItems) return;
+
+        for (let i = startIndex; i < subPool.length; i++) {
+          const p = subPool[i]._calcPrice;
+          if (currentSum + p <= budget) {
+            currentCombo.push(subPool[i]);
+            dfs(i + 1, currentCombo, currentSum + p);
+            currentCombo.pop();
           }
         }
       }
+      dfs(0, [], 0);
     }
 
-    combos.sort((a, b) => b.totalPrice - a.totalPrice);
-    const topCombos = combos.slice(0, 5);
+    // Try strict criteria first (85% budget, up to 5 items)
+    findCombos(0.85, 5);
+    
+    // Relax to 70%, up to 4 items
+    if (combos.length === 0) {
+      iterations = 0;
+      findCombos(0.70, 4);
+    }
+    
+    // Relax to 50%, up to 3 items
+    if (combos.length === 0) {
+      iterations = 0;
+      findCombos(0.50, 3);
+    }
+    
+    // Deduplicate identical combos by IDs
+    const uniqueCombosMap = new Map();
+    combos.forEach(c => {
+      const idKey = c.items.map(i => i.id || i.appId).sort().join('-');
+      if (!uniqueCombosMap.has(idKey)) uniqueCombosMap.set(idKey, c);
+    });
+    let uniqueCombos = Array.from(uniqueCombosMap.values());
+
+    // Sort by Total Price (closest to budget) and then by average discount
+    uniqueCombos.sort((a, b) => {
+      if (Math.abs(b.totalPrice - a.totalPrice) > 1000) {
+        return b.totalPrice - a.totalPrice;
+      }
+      return b.avgDiscount - a.avgDiscount;
+    });
+
+    const topCombos = uniqueCombos.slice(0, 5);
 
     if (!topCombos.length) {
       results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo 2-3 game khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
