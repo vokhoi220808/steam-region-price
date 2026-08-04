@@ -3047,57 +3047,85 @@ function initCoopWishlistModal() {
           </div>`).join("")
       : `<span style="font-size:12px;color:var(--text-muted);">${stats.totalAnalyzed} thành viên</span>`;
 
+    // ── review color mapping ──────────────────────────────────────────────────
+    const reviewColorMap = {
+      "Overwhelmingly Positive": "#1b9e6e", "Very Positive": "#4caf50",
+      "Positive": "#8bc34a", "Mostly Positive": "#cddc39",
+      "Mixed": "#ff9800", "Mostly Negative": "#ff5722",
+      "Negative": "#f44336", "Very Negative": "#b71c1c",
+      "Overwhelmingly Negative": "#7b0000"
+    };
+
     const matchCards = matches.map((m, idx) => {
       const priceVND = m.priceAmount ? m.priceAmount / 100 : null;
+      const origVND  = m.priceOriginal ? m.priceOriginal / 100 : null;
       const score = Math.round(getSmartScore(m));
       const scoreColor = score >= 60 ? '#27ae60' : score >= 40 ? '#f39c12' : '#888';
-      const displayPrice = m.isFree ? 'Miễn phí' : priceVND ? priceVND.toLocaleString('vi-VN') + 'đ' : 'Chưa có giá';
+      const displayPrice = m.isFree ? '<span style="color:#27ae60;">Miễn Phí</span>'
+        : priceVND ? `<span style="font-weight:800;font-size:16px;color:var(--success);">${priceVND.toLocaleString('vi-VN')}đ</span>${origVND && origVND > priceVND ? `<del style="font-size:12px;color:var(--text-muted);margin-left:6px;">${origVND.toLocaleString('vi-VN')}đ</del>` : ''}`
+        : '<span style="color:var(--text-muted);">Chưa có giá</span>';
       const totalBill = priceVND && m.matchCount ? (priceVND * m.matchCount).toLocaleString('vi-VN') + 'đ' : null;
-      const perPerson = priceVND ? priceVND.toLocaleString('vi-VN') + 'đ/người' : null;
-      const steamCartUrl = `https://store.steampowered.com/cart/addtocart/${m.appId}`;
+      const reviewColor = reviewColorMap[m.reviewDesc] || '#888';
+      const wanterAvatars = (m.wanters || []).map(p =>
+        `<img src="${p.avatar}" title="${p.personaname}" style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);" onerror="this.style.display='none'">`
+      ).join("");
+      const genrePills = (m.genres || []).map(g =>
+        `<span style="font-size:9px;color:var(--text-muted);padding:1px 6px;border:1px solid var(--border);border-radius:8px;">${g}</span>`
+      ).join("");
 
       return `
-        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;"
-             onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.4)'"
-             onmouseout="this.style.transform='';this.style.boxShadow=''">
-          <!-- Game banner row -->
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;animation:slideInUp 0.4s ease both;animation-delay:${idx * 60}ms;"
+             onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,0.5)';this.style.borderColor='rgba(102,126,234,0.4)'"
+             onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='var(--border)'">
+
+          ${idx === 0 ? `<div style="background:linear-gradient(90deg,#667eea,#764ba2);height:3px;"></div>` : ''}
+
           <div style="display:flex;gap:0;">
-            <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener" style="text-decoration:none;flex-shrink:0;">
-              <img src="${m.banner}" style="width:140px;height:65px;object-fit:cover;display:block;"
+            <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener" style="text-decoration:none;flex-shrink:0;position:relative;">
+              <img src="${m.banner}" style="width:150px;height:70px;object-fit:cover;display:block;"
                    onerror="this.src='https://cdn.akamai.steamstatic.com/steam/apps/${m.appId}/header.jpg'">
+              ${m.discountPercent > 0 ? `<div style="position:absolute;bottom:4px;left:4px;background:#e74c3c;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:4px;">-${m.discountPercent}%</div>` : ''}
             </a>
-            <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+
+            <div style="flex:1;padding:10px 12px;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:5px;">
                 <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener"
-                   style="text-decoration:none;font-weight:700;font-size:14px;color:var(--text-primary);line-height:1.3;">${m.name}</a>
-                <!-- Score badge -->
-                <div style="flex-shrink:0;text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:2px 8px;border:1px solid ${scoreColor}40;">
-                  <div style="font-size:15px;font-weight:800;color:${scoreColor};">${score}</div>
-                  <div style="font-size:9px;color:var(--text-muted);margin-top:-2px;">SCORE</div>
+                   style="text-decoration:none;font-weight:700;font-size:14px;color:var(--text-primary);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;"
+                   title="${m.name}">${m.name}</a>
+                <div style="flex-shrink:0;text-align:center;background:rgba(0,0,0,0.4);border-radius:8px;padding:2px 7px;border:1px solid ${scoreColor}50;min-width:42px;">
+                  <div style="font-size:14px;font-weight:800;color:${scoreColor};">${score}</div>
+                  <div style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px;">SCORE</div>
                 </div>
               </div>
-              <!-- Badges row -->
-              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
-                <span style="font-size:10px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700;">👥 ${m.matchCount}/${m.totalUsers} trùng</span>
-                ${m.isCoop ? `<span style="font-size:10px;background:#27ae6020;color:#27ae60;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #27ae6040;">🎮 Co-op</span>` : ''}
-                ${m.discountPercent > 0 ? `<span style="font-size:10px;background:#e74c3c20;color:#e74c3c;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #e74c3c40;">🔥 -${m.discountPercent}%</span>` : ''}
-                ${idx === 0 ? `<span style="font-size:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">⭐ Đề Xuất #1</span>` : ''}
+
+              <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                <span style="font-size:10px;background:var(--primary-soft);color:var(--primary);padding:2px 7px;border-radius:10px;font-weight:700;">👥 ${m.matchCount}/${m.totalUsers}</span>
+                ${m.isCoop ? `<span style="font-size:10px;background:#27ae6018;color:#27ae60;padding:2px 7px;border-radius:10px;font-weight:700;border:1px solid #27ae6030;">🎮 Co-op</span>` : ''}
+                ${idx === 0 ? `<span style="font-size:10px;background:linear-gradient(135deg,#f39c12,#e67e22);color:#fff;padding:2px 7px;border-radius:10px;font-weight:700;">⭐ #1</span>` : ''}
+                ${m.reviewDesc ? `<span style="font-size:10px;color:${reviewColor};font-weight:600;" title="${m.reviewTotal ? m.reviewTotal.toLocaleString() + ' đánh giá' : ''}">● ${m.reviewDesc}</span>` : ''}
+                ${genrePills}
+                ${wanterAvatars ? `<div style="display:flex;gap:2px;align-items:center;margin-left:2px;">${wanterAvatars}</div>` : ''}
               </div>
             </div>
           </div>
-          <!-- Price + action row -->
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);">
+
+          ${m.shortDesc ? `<div style="padding:6px 12px;font-size:11px;color:var(--text-muted);line-height:1.5;border-top:1px solid var(--border);background:rgba(0,0,0,0.1);">${m.shortDesc}</div>` : ''}
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);">
             <div>
-              <span style="font-weight:800;font-size:16px;color:var(--success);">${displayPrice}</span>
-              ${perPerson ? `<span style="font-size:11px;color:var(--text-muted);margin-left:8px;">~${perPerson}</span>` : ''}
-              ${totalBill ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Tổng nhóm: <strong style="color:var(--text-secondary);">${totalBill}</strong></div>` : ''}
+              ${displayPrice}
+              ${totalBill ? `<div style="font-size:10px;color:var(--text-muted);margin-top:1px;">Tổng nhóm: <strong style="color:var(--text-secondary);">${totalBill}</strong></div>` : ''}
             </div>
-            <a href="${steamCartUrl}" target="_blank" rel="noopener"
-               style="text-decoration:none;background:linear-gradient(135deg,#1b2838,#2a475e);color:#c7d5e0;font-size:12px;font-weight:700;padding:7px 16px;border-radius:8px;border:1px solid #4b6a88;transition:all 0.2s;display:flex;align-items:center;gap:5px;white-space:nowrap;"
-               onmouseover="this.style.background='linear-gradient(135deg,#2a475e,#1b2838)';this.style.color='#fff'"
-               onmouseout="this.style.background='linear-gradient(135deg,#1b2838,#2a475e)';this.style.color='#c7d5e0'">
-              🛒 Chốt Game
-            </a>
+            <div style="display:flex;gap:6px;">
+              <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener"
+                 style="text-decoration:none;font-size:11px;padding:5px 10px;border-radius:7px;border:1px solid var(--border);color:var(--text-secondary);background:transparent;transition:all 0.2s;"
+                 onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
+                 onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Chi tiết</a>
+              <a href="https://store.steampowered.com/cart/addtocart/${m.appId}" target="_blank" rel="noopener"
+                 style="text-decoration:none;background:linear-gradient(135deg,#1b2838,#2a475e);color:#c7d5e0;font-size:12px;font-weight:700;padding:5px 14px;border-radius:7px;border:1px solid #4b6a88;transition:all 0.2s;"
+                 onmouseover="this.style.color='#fff';this.style.borderColor='#76a2c8'"
+                 onmouseout="this.style.color='#c7d5e0';this.style.borderColor='#4b6a88'">🛒 Chốt</a>
+            </div>
           </div>
         </div>`;
     }).join("");
@@ -3105,28 +3133,58 @@ function initCoopWishlistModal() {
     // Summary stats bar
     const coopCount = matches.filter(m => m.isCoop).length;
     const onSaleCount = matches.filter(m => m.discountPercent > 0).length;
+    const totalGroupBill = matches.reduce((acc, m) => acc + (m.priceAmount ? m.priceAmount / 100 * m.matchCount : 0), 0);
+
+    // "Chốt tất" URLs for top 5
+    const topBuyLinks = matches.slice(0, 5).filter(m => m.priceAmount || m.isFree)
+      .map(m => `https://store.steampowered.com/app/${m.appId}`);
+    const shareSummary = `🎮 Party Game Finder\nTìm thấy ${matches.length} game trùng:\n` +
+      matches.slice(0, 5).map((m, i) => `${i+1}. ${m.name} — ${m.priceAmount ? (m.priceAmount/100).toLocaleString('vi-VN')+'đ' : 'Miễn phí'}${m.discountPercent > 0 ? ` (-${m.discountPercent}%)` : ''}`).join('\n');
 
     results.innerHTML = `
+      <!-- ── CSS for entrance animation ── -->
+      <style>
+        @keyframes slideInUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      </style>
+
       <!-- Player team bar -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px;background:rgba(102,126,234,0.08);border:1px solid rgba(102,126,234,0.2);border-radius:12px;">
-        <span style="font-size:12px;color:var(--text-muted);font-weight:600;">TỔ ĐỘI:</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:rgba(102,126,234,0.07);border:1px solid rgba(102,126,234,0.18);border-radius:12px;">
+        <span style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Tổ Đội</span>
         ${playerBadges}
       </div>
 
-      <!-- Stats bar -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <!-- Stats bar (4 cells) -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
         <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-          <div style="font-size:22px;font-weight:800;color:var(--primary);">${matches.length}</div>
-          <div style="font-size:11px;color:var(--text-muted);">Game trùng</div>
+          <div style="font-size:20px;font-weight:800;color:var(--primary);">${matches.length}</div>
+          <div style="font-size:10px;color:var(--text-muted);">Game trùng</div>
         </div>
         <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-          <div style="font-size:22px;font-weight:800;color:#27ae60;">${coopCount}</div>
-          <div style="font-size:11px;color:var(--text-muted);">Game Co-op</div>
+          <div style="font-size:20px;font-weight:800;color:#27ae60;">${coopCount}</div>
+          <div style="font-size:10px;color:var(--text-muted);">Co-op</div>
         </div>
         <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-          <div style="font-size:22px;font-weight:800;color:#e74c3c;">${onSaleCount}</div>
-          <div style="font-size:11px;color:var(--text-muted);">Đang giảm giá</div>
+          <div style="font-size:20px;font-weight:800;color:#e74c3c;">${onSaleCount}</div>
+          <div style="font-size:10px;color:var(--text-muted);">Đang Sale</div>
         </div>
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:16px;font-weight:800;color:#f39c12;">${totalGroupBill > 0 ? Math.round(totalGroupBill / 1000) + 'K' : '--'}</div>
+          <div style="font-size:10px;color:var(--text-muted);">Tổng bill (đ)</div>
+        </div>
+      </div>
+
+      <!-- Action bar: share + chot tat -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(shareSummary)}).then(()=>{this.textContent='✅ Đã copy!';setTimeout(()=>this.textContent='📋 Chia sẻ kết quả',2000)})"
+          style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;font-weight:600;padding:8px;border-radius:8px;cursor:pointer;transition:all 0.2s;"
+          onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">📋 Chia sẻ kết quả</button>
+        ${topBuyLinks.length ? `<button onclick="(${JSON.stringify(topBuyLinks)}).forEach((u,i)=>setTimeout(()=>window.open(u,'_blank'),i*300))"
+          style="flex:1;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-size:12px;font-weight:700;padding:8px;border-radius:8px;cursor:pointer;transition:opacity 0.2s;"
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🎯 Chốt Tất (Top ${topBuyLinks.length})</button>` : ''}
       </div>
 
       <!-- Game cards -->

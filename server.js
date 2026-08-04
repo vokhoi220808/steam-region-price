@@ -1070,12 +1070,15 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
       return res.status(400).json({ error: "Cần ít nhất 2 tài khoản có Wishlist công khai.", details: errors });
     }
     const counts = new Map();
+    const wantersMap = new Map(); // track which steamId wants each appId
     for (const w of wishlists) {
       const seen = new Set();
       for (const item of w.items) {
         if (!seen.has(item.appId)) {
           seen.add(item.appId);
           counts.set(item.appId, (counts.get(item.appId) || 0) + 1);
+          if (!wantersMap.has(item.appId)) wantersMap.set(item.appId, []);
+          wantersMap.get(item.appId).push(w.steamId);
         }
       }
     }
@@ -1086,23 +1089,33 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
       if (count >= 2) matchedAppIds.push({ appId, count });
     }
 
-    // Fetch game details from Steam Store API for all matched games
+    // Fetch game details from Steam Store API for all matched games in parallel
     const cc = req.query.cc || 'vn';
     const gameDetails = await Promise.allSettled(
       matchedAppIds.map(({ appId }) =>
-        fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=basic,price_overview,categories,genres`, {
+        fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=basic,price_overview,categories,genres,reviews`, {
           headers: { "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
           signal: AbortSignal.timeout(8000)
         }).then(r => r.json()).catch(() => null)
       )
     );
 
+    const players = await getPlayerSummaries(wishlists.map(w => w.steamId));
+    const playerMap = Object.fromEntries((players || []).map(p => [p.steamid, p]));
+
     const matches = matchedAppIds.map(({ appId, count }, idx) => {
       const settled = gameDetails[idx];
       const gameData = settled.status === "fulfilled" ? settled.value?.[String(appId)]?.data : null;
       const cats = (gameData?.categories || []).map(c => c.description || "");
-      const isCoop = cats.some(c => ["Multi-player","Co-op","Online Co-op","Local Co-op"].includes(c));
+      const genres = (gameData?.genres || []).map(g => g.description || "").slice(0, 3);
+      const isCoop = cats.some(c => ["Multi-player","Co-op","Online Co-op","Local Co-op","Shared/Split Screen Co-op"].includes(c));
       const priceOverview = gameData?.price_overview;
+      const reviews = gameData?.recommendations;
+      const reviewTotal = reviews?.total || 0;
+      // Derive positive sentiment label from metacritic or estimated via review_score_desc
+      const reviewDesc = gameData?.review_score_desc || null;
+      const wanters = (wantersMap.get(appId) || []).map(sid => playerMap[sid]).filter(Boolean);
+
       return {
         appId,
         matchCount: count,
@@ -1111,10 +1124,17 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
         banner: gameData?.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
         discountPercent: priceOverview?.discount_percent || 0,
         priceAmount: priceOverview?.final || null,
+        priceOriginal: priceOverview?.initial || null,
         priceCurrency: priceOverview?.currency || cc.toUpperCase(),
         isFree: Boolean(gameData?.is_free),
         type: gameData?.type || "game",
-        isCoop
+        isCoop,
+        genres,
+        reviewTotal,
+        reviewDesc,
+        shortDesc: gameData?.short_description ? gameData.short_description.slice(0, 120) + '...' : null,
+        releaseDate: gameData?.release_date?.date || null,
+        wanters  // array of player objects who want this game
       };
     });
 
@@ -1125,7 +1145,6 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
       return b.discountPercent - a.discountPercent;
     });
 
-    const players = await getPlayerSummaries(wishlists.map(w => w.steamId));
     res.json({ success: true, matchedCount: matches.length, totalAnalyzed: wishlists.length, matches, errors, players });
   } catch (error) { next(error); }
 });
