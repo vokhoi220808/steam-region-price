@@ -1492,6 +1492,121 @@ app.get("/game/:appId", async (req, res, next) => {
   }
 });
 
+// LEADERBOARDS ENDPOINT
+app.get("/api/leaderboards", async (req, res, next) => {
+  try {
+    const category = String(req.query.category || "largest_gap");
+    const deals = await fetchTopDeals(false).catch(() => []);
+    let items = (deals || []).filter(g => g.price && g.price.final > 0);
+
+    if (category === "largest_gap") {
+      items.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+    } else if (category === "max_savings") {
+      items.sort((a, b) => ((b.price.initial || 0) - b.price.final) - ((a.price.initial || 0) - a.price.final));
+    } else if (category === "under_100k") {
+      items = items.filter(g => g.price.final <= 100000);
+      items.sort((a, b) => b.price.final - a.price.final);
+    } else if (category === "overwhelmingly_positive") {
+      items = items.filter(g => (g.reviewScore || 0) >= 90);
+      items.sort((a, b) => (b.reviewScore || 0) - (a.reviewScore || 0));
+    } else if (category === "historical_lows") {
+      items = items.filter(g => g.isHistoricalLow);
+    }
+
+    res.json({ category, count: items.length, items: items.slice(0, 20) });
+  } catch (err) { next(err); }
+});
+
+// PRICE ANOMALY DETECTOR ENDPOINT
+app.get("/api/anomalies", async (req, res, next) => {
+  try {
+    const deals = await fetchTopDeals(false).catch(() => []);
+    const anomalies = (deals || []).filter(g => (g.discountPercent >= 90) || (g.price && g.price.final < 10000 && g.price.initial > 500000))
+      .map(g => ({
+        appId: g.appId,
+        name: g.name,
+        image: g.headerImage || g.image,
+        price: g.price,
+        discountPercent: g.discountPercent,
+        isAnomaly: true,
+        anomalyReason: g.discountPercent >= 95 ? "Giảm giá bất thường (>95%)" : "Chênh lệch giá nghi vấn lỗi hệ thống"
+      }));
+    res.json({ count: anomalies.length, items: anomalies });
+  } catch (err) { next(err); }
+});
+
+// EMBEDDABLE PRICE WIDGET ENDPOINT
+app.get("/embed/:appId", async (req, res, next) => {
+  const appId = String(req.params.appId || "");
+  if (!/^\d+$/.test(appId)) return res.status(400).send("App ID không hợp lệ.");
+
+  try {
+    const quote = await getRegionalPrice(appId, REGIONS.find((r) => r.code === "vn") || REGIONS[0], "vietnamese");
+    const name = quote?.gameName || `Steam App ${appId}`;
+    const priceVn = quote?.isFree ? "Miễn phí" : (quote?.finalFormatted || "N/A");
+    const discount = quote?.discountPercent > 0 ? `-${quote.discountPercent}%` : "";
+    const image = quote?.image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+
+    const html = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtmlAttribute(name)} - Embed Card</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #0b1320; color: #f1f5f9; padding: 12px; }
+    .card { background: #132238; border: 1px solid rgba(0,240,255,0.2); border-radius: 12px; padding: 12px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s; }
+    .card:hover { border-color: #00f0ff; }
+    .img { width: 110px; height: 52px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+    .info { flex: 1; min-width: 0; }
+    .title { font-size: 14px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .price { font-size: 14px; font-weight: 700; color: #00f0ff; }
+    .badge { background: rgba(34,197,94,0.2); color: #22c55e; border: 1px solid rgba(34,197,94,0.4); font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+    .brand { font-size: 10px; color: #748196; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a class="card" href="/game/${appId}" target="_blank" rel="noopener">
+    <img class="img" src="${escapeHtmlAttribute(image)}" alt="${escapeHtmlAttribute(name)}">
+    <div class="info">
+      <div class="title">${escapeHtmlAttribute(name)}</div>
+      <div class="meta">
+        <span class="price">${escapeHtmlAttribute(priceVn)}</span>
+        ${discount ? `<span class="badge">${discount}</span>` : ''}
+      </div>
+      <div class="brand">🎮 Steam Region Price</div>
+    </div>
+  </a>
+</body>
+</html>`;
+    res.setHeader("Cache-Control", "public, max-age=1800");
+    res.type("html").send(html.trim());
+  } catch (err) { next(err); }
+});
+
+// COMMUNITY PULSE ENDPOINTS
+const communityVotesMemory = new Map();
+
+app.get("/api/community/reviews/:appId", (req, res) => {
+  const appId = String(req.params.appId);
+  const votes = communityVotesMemory.get(appId) || { worth_buying: 12, wait_sale: 3, game_pass: 1, price_error: 0 };
+  res.json({ appId, votes });
+});
+
+app.post("/api/community/reviews/:appId/vote", (req, res) => {
+  const appId = String(req.params.appId);
+  const { tag } = req.body || {};
+  if (!tag) return res.status(400).json({ error: "Thẻ vote không hợp lệ." });
+
+  const current = communityVotesMemory.get(appId) || { worth_buying: 12, wait_sale: 3, game_pass: 1, price_error: 0 };
+  current[tag] = (current[tag] || 0) + 1;
+  communityVotesMemory.set(appId, current);
+
+  res.json({ appId, votes: current, success: true });
+});
+
 app.use("/api", createReliabilityRouter({ cacheStats, cacheSize: () => cache.size }));
 
 app.use((error, _req, res, _next) => {

@@ -514,6 +514,7 @@ async function init() {
   initBudgetComboModal();
   initCoopWishlistModal();
   initRealCostModal();
+  initEmbedModal();
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -2958,6 +2959,38 @@ function initRealCostModal() {
     el?.addEventListener("input", calculate);
   });
 }
+
+// 4. EMBED WIDGET MODAL & CODE GENERATOR
+function initEmbedModal() {
+  const modal = document.getElementById("embedModal");
+  const closeBtn = document.getElementById("closeEmbedModal");
+  const copyBtn = document.getElementById("copyEmbedCodeBtn");
+  const textarea = document.getElementById("embedCodeSnippet");
+
+  if (!modal) return;
+
+  closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+
+  copyBtn?.addEventListener("click", () => {
+    if (!textarea?.value) return;
+    navigator.clipboard.writeText(textarea.value);
+    showToast("Đã copy mã nhúng widget vào bộ nhớ tạm!", "success");
+  });
+}
+
+function openEmbedWidgetModal(appId) {
+  const targetId = appId || state.currentData?.appId;
+  const modal = document.getElementById("embedModal");
+  const textarea = document.getElementById("embedCodeSnippet");
+
+  if (!targetId || !modal || !textarea) return;
+
+  const origin = window.location.origin;
+  textarea.value = `<iframe src="${origin}/embed/${targetId}" width="100%" height="90" frameborder="0" loading="lazy" title="Steam Regional Price Embed"></iframe>`;
+  modal.classList.remove("hidden");
+}
+window.openEmbedWidgetModal = openEmbedWidgetModal;
 
 // SMART BUNDLE & DLC SAVINGS ANALYZER
 function setupGameExtraTools(appId) {
