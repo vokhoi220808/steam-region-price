@@ -490,7 +490,8 @@ async function init() {
   
   // Check URL params
   const urlParams = new URLSearchParams(window.location.search);
-  const appIdParam = urlParams.get('appId');
+  const routeMatch = window.location.pathname.match(/^\/game\/(\d+)\/?$/);
+  const appIdParam = urlParams.get('appId') || routeMatch?.[1];
   state.selectedProductType = urlParams.get('type') === 'sub' ? 'sub' : 'app';
   if (appIdParam) {
     document.getElementById("searchInput").value = appIdParam;
@@ -1395,6 +1396,8 @@ function setupEvents() {
     globalRegionSelect.addEventListener("change", (e) => {
       state.region = e.target.value.toUpperCase();
       localStorage.setItem("steam_region", state.region);
+      const selectedRegion = REGIONS_DATA.find((region) => region.code === state.region.toLowerCase());
+      if (selectedRegion?.curr) changeCurrency(selectedRegion.curr);
       
       const dealsView = document.getElementById("dealsView");
       if (!dealsView.classList.contains("hidden")) {
@@ -1405,9 +1408,10 @@ function setupEvents() {
         document.getElementById("dealsSpotlight").style.display = "none";
         fetchTopDeals(true);
       } else {
+        const currentAppId = state.currentData?.appId;
         const searchInput = document.getElementById("searchInput");
-        if (searchInput && searchInput.value) {
-          fetchRealData(searchInput.value);
+        if (currentAppId || searchInput?.value) {
+          fetchRealData(String(currentAppId || searchInput.value), state.currentData?.productType);
         }
       }
     });
@@ -1727,6 +1731,85 @@ function updateDealsCountdowns() {
   });
 }
 
+function normalizeComparisonPrice(price) {
+  const dataRegion = REGIONS_DATA.find((region) => region.code === price.code);
+  return {
+    code: price.code,
+    name: dataRegion ? (state.lang === "vi" ? dataRegion.name : dataRegion.en_name) : price.code.toUpperCase(),
+    flag: getFlagHtml(price.code),
+    curr: price.currency,
+    available: Boolean(price.available),
+    isFree: Boolean(price.isFree),
+    initial: price.initial || 0,
+    final: price.final || 0,
+    discount: price.discountPercent || 0,
+    backendConvertedValue: Number.isFinite(price.convertedValue) ? price.convertedValue : null
+  };
+}
+
+function buildComparisonViewData(metadata, rawPrices, appId, productType) {
+  const firstValue = (field) => rawPrices.find((price) => price[field])?.[field] || null;
+  const gameName = metadata.gameName || firstValue("gameName");
+  const developer = metadata.developer || firstValue("developer");
+  const publisher = metadata.publisher || firstValue("publisher");
+  const genres = metadata.genres || firstValue("genres");
+  return {
+    appId: Number(metadata.appId || appId),
+    productType: metadata.productType || productType,
+    name: gameName || "",
+    image: metadata.image || firstValue("image") || "",
+    developer: developer || publisher || t("unknown"),
+    publisher: publisher || developer || t("unknown"),
+    release: metadata.releaseDate || firstValue("releaseDate") || t("unknown"),
+    tags: genres ? genres.split(", ").slice(0, 4) : ["Game"],
+    description: metadata.shortDescription || firstValue("shortDescription") || (state.lang === "vi" ? "Không có thông tin giới thiệu." : "No description available."),
+    prices: rawPrices.map(normalizeComparisonPrice),
+    steamVerified: Boolean(gameName)
+  };
+}
+
+async function fetchComparisonStream(url, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Không thể tải dữ liệu giá.");
+  }
+
+  const rawPrices = [];
+  let metadata = {};
+  const consumeLine = (line) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (event.type === "error") throw new Error(event.error || "Không thể tải dữ liệu giá.");
+    if (event.type === "price") {
+      const existingIndex = rawPrices.findIndex((price) => price.code === event.price.code);
+      if (existingIndex >= 0) rawPrices[existingIndex] = event.price;
+      else rawPrices.push(event.price);
+      onProgress?.({ metadata, rawPrices: [...rawPrices], completed: event.completed, total: event.total });
+    }
+    if (event.type === "complete") metadata = { ...metadata, ...event.data };
+  };
+
+  if (!response.body?.getReader) {
+    (await response.text()).split("\n").forEach(consumeLine);
+    return { ...metadata, prices: rawPrices };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    lines.forEach(consumeLine);
+    if (done) break;
+  }
+  consumeLine(buffer);
+  return { ...metadata, prices: rawPrices };
+}
+
 async function fetchRealData(query, requestedType = null) {
   const searchInput = document.getElementById("searchInput");
   let appId = String(query || "").trim();
@@ -1765,37 +1848,25 @@ async function fetchRealData(query, requestedType = null) {
   loadingState.scrollIntoView({ behavior: "smooth", block: "center" });
   
   try {
-    const res = await fetch(`/api/compare/${appId}?currency=${state.currency}&regions=${regionCodes}&lang=${state.lang}&type=${productType}`);
-    if (!res.ok) throw new Error("Lỗi tải dữ liệu");
-    const data = await res.json();
-    
-    const prices = data.prices.map(p => {
-      const dataRegion = REGIONS_DATA.find(r => r.code === p.code);
-      const rName = state.lang === "vi" ? dataRegion.name : dataRegion.en_name;
-      return {
-        code: p.code,
-        name: rName,
-        flag: getFlagHtml(p.code),
-        curr: p.currency,
-        available: p.available && !p.isFree,
-        initial: p.initial || 0,
-        final: p.final || 0,
-        discount: p.discountPercent || 0
-      };
+    const streamUrl = `/api/compare-stream/${appId}?currency=${state.currency}&regions=${regionCodes}&lang=${state.lang}&type=${productType}`;
+    const data = await fetchComparisonStream(streamUrl, ({ metadata, rawPrices, completed, total }) => {
+      const partial = buildComparisonViewData(metadata, rawPrices, appId, productType);
+      loadingProgressText.textContent = t("loading_progress").replace("{count}", completed).replace("{total}", total);
+      loadingProgressBar.style.width = `${Math.max(12, Math.round((completed / total) * 100))}%`;
+      if (!partial.steamVerified) return;
+      state.currentData = partial;
+      state.checkedAt = new Date();
+      processData();
+      renderData();
+      document.getElementById("resultsArea").classList.remove("hidden");
     });
-    
-    state.currentData = {
-      appId: data.appId,
-      productType: data.productType || productType,
-      name: data.gameName || "Trò chơi chưa xác định",
-      image: data.image || "",
-      developer: data.developer || data.publisher || t("unknown"),
-      publisher: data.publisher || data.developer || t("unknown"),
-      release: data.releaseDate || t("unknown"),
-      tags: data.genres ? data.genres.split(", ").slice(0, 4) : ["Game"],
-      description: data.shortDescription || (state.lang === "vi" ? "Không có thông tin giới thiệu." : "No description available."),
-      prices: prices
-    };
+
+    state.currentData = buildComparisonViewData(data, data.prices || [], appId, productType);
+    if (!state.currentData.steamVerified) {
+      throw new Error(productType === "sub"
+        ? "Package ID không tồn tại trên Steam Store."
+        : "App ID không tồn tại trên Steam Store.");
+    }
     
     state.checkedAt = new Date(data.checkedAt);
     updateTimeAgo();
@@ -1809,16 +1880,28 @@ async function fetchRealData(query, requestedType = null) {
     
     // Update URL for sharing
     const url = new URL(window.location);
-    url.searchParams.set('appId', appId);
-    if (productType === "sub") url.searchParams.set('type', 'sub');
-    else url.searchParams.delete('type');
+    if (productType === "app") {
+      url.pathname = `/game/${appId}`;
+      url.searchParams.delete('appId');
+      url.searchParams.delete('type');
+    } else {
+      url.pathname = "/";
+      url.searchParams.set('appId', appId);
+      url.searchParams.set('type', 'sub');
+    }
     window.history.pushState({}, '', url);
     
   } catch (error) {
     loadingState.classList.add("hidden");
     document.getElementById("resultsArea").classList.add("hidden");
     document.getElementById("errorState").classList.remove("hidden");
-    console.error(error);
+    const errorDescription = document.getElementById("errorDesc");
+    if (errorDescription) errorDescription.textContent = error.message || t("err_desc");
+    if (/không tồn tại|not exist/i.test(error.message || "")) {
+      setInlineFieldError(searchInput, error.message);
+    }
+    if (/không tồn tại|not exist/i.test(error.message || "")) console.warn(error.message);
+    else console.error(error);
   } finally {
     loadingState.removeAttribute("aria-busy");
     compareButtons.forEach(button => { button.disabled = false; });
@@ -1830,7 +1913,9 @@ function processData() {
   state.currentData.prices.forEach(p => {
     if (p.available && p.curr) {
       const nativeRate = LIVE_FX[p.curr] || 1;
-      p.convertedValue = (p.final / nativeRate) * targetRate;
+      p.convertedValue = LIVE_FX[p.curr] && LIVE_FX[state.currency]
+        ? (p.final / nativeRate) * targetRate
+        : (p.backendConvertedValue ?? p.final);
     } else {
       p.convertedValue = 0;
     }
@@ -2421,6 +2506,10 @@ document.addEventListener("DOMContentLoaded", init);
 // --- TRACKER BRIDGE ---
 // Called from Compare/Deals views when user clicks "Add to Radar"
 function toggleTrackGame(appId, name, image) {
+  if (!state.currentData?.steamVerified || Number(state.currentData.appId) !== Number(appId)) {
+    showFeedback("Game chưa được Steam xác thực nên không thể đưa vào Radar.", "error");
+    return;
+  }
   // Use new StorageRepository if available
   const repo = window._trackerRepo;
   if (!repo) {
@@ -2602,261 +2691,126 @@ function initCoopWishlistModal() {
   });
 }
 
-// 3 & 4. REALTIME SYSTEM REQUIREMENTS MATCHER & SMART BUNDLE SAVINGS
+// SMART BUNDLE & DLC SAVINGS ANALYZER
 function setupGameExtraTools(appId) {
   const targetId = appId || state.currentData?.appId;
-  const specsTabBtn = document.getElementById("tabPcSpecsBtn");
-  const bundleTabBtn = document.getElementById("tabBundleSavingsBtn");
-  const specsContent = document.getElementById("pcSpecsTabContent");
-  const bundleContent = document.getElementById("bundleSavingsTabContent");
-  const gpuSelect = document.getElementById("userGpuSelect");
-  const ramSelect = document.getElementById("userRamSelect");
-  const pcAssess = document.getElementById("pcHardwareAssessment");
   const bundleResult = document.getElementById("bundleSavingsResult");
-
-  if (!specsTabBtn || !bundleTabBtn) return;
-
-  specsTabBtn.onclick = () => {
-    specsTabBtn.classList.add("active");
-    specsTabBtn.classList.remove("btn-secondary");
-    specsTabBtn.classList.add("btn-primary");
-    bundleTabBtn.classList.remove("active");
-    bundleTabBtn.classList.remove("btn-primary");
-    bundleTabBtn.classList.add("btn-secondary");
-    if (specsContent) specsContent.style.display = "block";
-    if (bundleContent) bundleContent.style.display = "none";
-  };
-
-  bundleTabBtn.onclick = () => {
-    bundleTabBtn.classList.add("active");
-    bundleTabBtn.classList.remove("btn-secondary");
-    bundleTabBtn.classList.add("btn-primary");
-    specsTabBtn.classList.remove("active");
-    specsTabBtn.classList.remove("btn-primary");
-    specsTabBtn.classList.add("btn-secondary");
-    if (bundleContent) bundleContent.style.display = "block";
-    if (specsContent) specsContent.style.display = "none";
-    if (targetId) fetchBundleData(targetId);
-  };
-
-  // Full GPU tier map (0=iGPU ... 10=RTX4090)
-  const GPU_TIER = {
-    igpu: 0, arc380: 1, gtx1050: 1, rtx3050m: 1,
-    gtx1050ti: 2, arc770: 3, rx580: 3,
-    gtx1650: 3, rtx4060m: 3,
-    gtx1080: 4, rtx2060: 4, rx6600: 4,
-    rtx3060: 5, rx6700: 5,
-    rtx3080: 6, rx7700: 6, rtx4060: 6,
-    rtx4070: 7, rx7900: 7,
-    rtx4080: 8, rtx4090: 9
-  };
-
-  // CPU tier map (0=old i3 ... 8=i9/Ryzen9)
-  const CPU_TIER = {
-    i3old: 1, i5old: 2, ryzen3: 3, i3: 3,
-    i5: 5, ryzen5: 5,
-    i7: 6, ryzen7: 6,
-    i9: 8, ryzen9: 8
-  };
-
-  const cpuSelect = document.getElementById("userCpuSelect");
-
-  async function fetchAndEvaluateSpecs() {
-    if (!pcAssess || !targetId) return;
-    const gpu = gpuSelect?.value || "rtx3060";
-    const cpu = cpuSelect?.value || "ryzen5";
-    const ram = Number(ramSelect?.value || 16);
-
-    pcAssess.innerHTML = `<div style="color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;">
-      <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span> Đang lấy yêu cầu hệ thống từ Steam...
-    </div>`;
-
-    const userGpuTier = GPU_TIER[gpu] ?? 3;
-    const userCpuTier = CPU_TIER[cpu] ?? 3;
-
-    try {
-      const res = await fetch(`/api/sysreqs/${targetId}`);
-      const data = await res.json();
-      if (!res.ok || (!data.minimum && !data.recommended)) throw new Error("no_data");
-
-      const text = (data.minimum + " " + data.recommended).toLowerCase();
-
-      // --- Parse RAM ---
-      const ramMatches = [...text.matchAll(/(\d+)\s*gb\s*(?:of\s*)?ram/g)].map(m => Number(m[1]));
-      const reqRamMin = ramMatches.length ? Math.min(...ramMatches) : 8;
-      const reqRamRec = ramMatches.length > 1 ? Math.max(...ramMatches) : reqRamMin;
-
-      // --- Parse GPU ---
-      const GPU_KEYWORDS = [
-        { keys: ["rtx 4090","rtx4090"], tier: 9, label: "RTX 4090" },
-        { keys: ["rtx 4080","rtx4080"], tier: 8, label: "RTX 4080" },
-        { keys: ["rtx 4070","rtx4070","rx 7900"], tier: 7, label: "RTX 4070 / RX 7900" },
-        { keys: ["rtx 4060","rtx4060","rx 7700"], tier: 6, label: "RTX 4060 / RX 7700" },
-        { keys: ["rtx 3080","rtx3080","rx 6800"], tier: 6, label: "RTX 3080 / RX 6800" },
-        { keys: ["rtx 3070","rtx3070","rx 6700"], tier: 5, label: "RTX 3070 / RX 6700" },
-        { keys: ["rtx 3060","rtx3060","rtx 2070","rx 6600"], tier: 5, label: "RTX 3060 / RX 6600" },
-        { keys: ["rtx 2060","rtx2060","gtx 1080 ti","rx 5700"], tier: 4, label: "RTX 2060 / GTX 1080 Ti" },
-        { keys: ["gtx 1080","gtx1080","rx 5600"], tier: 4, label: "GTX 1080 / RX 5600" },
-        { keys: ["gtx 1660","gtx1660","gtx 1650 super","rx 5500","rx580"], tier: 3, label: "GTX 1660 / RX 580" },
-        { keys: ["gtx 1060","gtx1060","rx 480","rx480"], tier: 3, label: "GTX 1060 / RX 480" },
-        { keys: ["gtx 1050 ti","gtx1050ti","rx 470","rx470"], tier: 2, label: "GTX 1050 Ti / RX 470" },
-        { keys: ["gtx 1050","gtx1050","rx 460","rx460"], tier: 1, label: "GTX 1050 / RX 460" },
-        { keys: ["intel iris","intel hd","igpu","integrated","intel(r) uhd"], tier: 0, label: "Intel iGPU" },
-      ];
-      let reqGpuMinTier = 2, reqGpuMinLabel = "GTX 1050 Ti";
-      let reqGpuRecTier = -1, reqGpuRecLabel = "";
-
-      // Check minimum section
-      const minText = data.minimum.toLowerCase();
-      const recText = (data.recommended || "").toLowerCase();
-      for (const g of GPU_KEYWORDS) {
-        if (reqGpuMinTier === 2 && g.keys.some(k => minText.includes(k))) {
-          reqGpuMinTier = g.tier; reqGpuMinLabel = g.label;
-        }
-        if (reqGpuRecTier === -1 && recText && g.keys.some(k => recText.includes(k))) {
-          reqGpuRecTier = g.tier; reqGpuRecLabel = g.label;
-        }
-      }
-      if (reqGpuRecTier === -1) { reqGpuRecTier = reqGpuMinTier; reqGpuRecLabel = reqGpuMinLabel; }
-
-      // --- Parse CPU ---
-      const CPU_KEYWORDS = [
-        { keys: ["i9","ryzen 9"], tier: 8, label: "Core i9 / Ryzen 9" },
-        { keys: ["i7","ryzen 7"], tier: 6, label: "Core i7 / Ryzen 7" },
-        { keys: ["i5","ryzen 5"], tier: 5, label: "Core i5 / Ryzen 5" },
-        { keys: ["i3","ryzen 3"], tier: 3, label: "Core i3 / Ryzen 3" },
-      ];
-      let reqCpuTier = 3, reqCpuLabel = "Core i5 / Ryzen 5";
-      for (const c of CPU_KEYWORDS) {
-        if (c.keys.some(k => minText.includes(k))) { reqCpuTier = c.tier; reqCpuLabel = c.label; break; }
-      }
-
-      // --- DirectX ---
-      const dxMatch = text.match(/directx[:\s]+version\s+(\d+)/i) || text.match(/directx\s*(\d+)/i);
-      const reqDx = dxMatch ? Number(dxMatch[1]) : 11;
-
-      // --- Score each component (0–100) ---
-      const gpuScore  = Math.min(100, Math.round((userGpuTier / Math.max(reqGpuRecTier, 1)) * 100));
-      const cpuScore  = Math.min(100, Math.round((userCpuTier / Math.max(reqCpuTier, 1)) * 100));
-      const ramScore  = Math.min(100, Math.round((ram / Math.max(reqRamRec, 1)) * 100));
-
-      const overallScore = Math.round((gpuScore * 0.5 + cpuScore * 0.3 + ramScore * 0.2));
-
-      // --- Verdict ---
-      let verdict, icon, mainColor, settingTip;
-      if (overallScore >= 120 || (userGpuTier >= reqGpuRecTier + 2 && ram >= reqRamRec)) {
-        icon = "🚀"; mainColor = "#22c55e"; verdict = "Chạy NGON – 4K / Ultra";
-        settingTip = "Máy bạn vượt xa yêu cầu đề xuất. Thử bật Ray Tracing hoặc 4K!";
-      } else if (overallScore >= 90 && userGpuTier >= reqGpuRecTier && ram >= reqRamRec) {
-        icon = "✅"; mainColor = "#22c55e"; verdict = "Chạy MƯỢT – 1080p High/Ultra";
-        settingTip = "Máy bạn đáp ứng yêu cầu đề xuất. High settings, 60+ FPS ổn định.";
-      } else if (overallScore >= 70 && userGpuTier >= reqGpuMinTier && ram >= reqRamMin) {
-        icon = "⚡"; mainColor = "#f59e0b"; verdict = "Chạy ổn – 1080p Medium";
-        settingTip = "Đáp ứng yêu cầu tối thiểu. Chỉnh Medium để giữ 60 FPS.";
-      } else if (userGpuTier >= reqGpuMinTier - 1 || ram >= reqRamMin) {
-        icon = "⚠️"; mainColor = "#ef4444"; verdict = "Có thể giật lag – 720p Low";
-        settingTip = "Gần đạt tối thiểu. 720p Low settings, khả năng dưới 30 FPS.";
-      } else {
-        icon = "❌"; mainColor = "#ef4444"; verdict = "KHÔNG đủ cấu hình";
-        settingTip = `Game yêu cầu tối thiểu: ${reqGpuMinLabel}, ${reqRamMin}GB RAM. Máy bạn khó chạy được.`;
-      }
-
-      const bar = (score, color) => {
-        const pct = Math.min(score, 100);
-        const c = score >= 100 ? "#22c55e" : score >= 75 ? "#f59e0b" : "#ef4444";
-        return `<div style="background:var(--border);border-radius:4px;height:6px;width:100%;overflow:hidden;">
-          <div style="width:${pct}%;height:100%;background:${c};border-radius:4px;transition:width 0.5s;"></div>
-        </div>`;
-      };
-      const pct = (v, req) => `<span style="font-size:10px;color:${v>=req?'#22c55e':'#ef4444'}">${v>=req?'✓':'✗'} ${v}/${req}</span>`;
-
-      const minSnip = data.minimum?.substring(0, 180) || "";
-
-      pcAssess.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <div style="font-size:28px;line-height:1;">${icon}</div>
-          <div>
-            <div style="font-weight:800;color:${mainColor};font-size:15px;">${verdict}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${settingTip}</div>
-          </div>
-        </div>
-
-        <div style="display:grid;gap:8px;margin-bottom:10px;">
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-              <span style="font-weight:600;">🎮 GPU</span>
-              <span style="color:var(--text-muted);">Bạn: <b>${gpu.toUpperCase()}</b> | Tối thiểu: ${reqGpuMinLabel} | Đề xuất: ${reqGpuRecLabel}</span>
-            </div>
-            ${bar(Math.min(Math.round(userGpuTier/Math.max(reqGpuRecTier,1)*100),120))}
-          </div>
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-              <span style="font-weight:600;">⚙️ CPU</span>
-              <span style="color:var(--text-muted);">Bạn: <b>${cpu.toUpperCase()}</b> | Yêu cầu: ${reqCpuLabel}</span>
-            </div>
-            ${bar(Math.round(userCpuTier/Math.max(reqCpuTier,1)*100))}
-          </div>
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-              <span style="font-weight:600;">💾 RAM</span>
-              <span style="color:var(--text-muted);">Bạn: <b>${ram}GB</b> | Tối thiểu: ${reqRamMin}GB | Đề xuất: ${reqRamRec}GB</span>
-            </div>
-            ${bar(Math.round(ram/Math.max(reqRamRec,1)*100))}
-          </div>
-        </div>
-
-        <div style="font-size:11px;color:var(--text-muted);display:flex;gap:16px;margin-bottom:${minSnip?'8px':'0'};">
-          <span>DirectX ${reqDx} yêu cầu</span>
-          <span>Overall score: <b style="color:${mainColor};">${overallScore}%</b></span>
-        </div>
-
-        ${minSnip ? `<details style="cursor:pointer;margin-top:6px;">
-          <summary style="font-size:10px;color:var(--text-muted);">📋 Xem yêu cầu tối thiểu từ Steam</summary>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.6;white-space:pre-wrap;">${minSnip}${data.minimum.length > 180 ? '...' : ''}</div>
-        </details>` : ''}
-      `;
-    } catch (e) {
-      const userGpuTier2 = GPU_TIER[gpuSelect?.value || "rtx3060"] ?? 3;
-      const ram2 = Number(ramSelect?.value || 16);
-      let icon = "✅", color = "#22c55e", msg = "Cấu hình tốt – đủ chạy hầu hết game hiện đại.";
-      if (userGpuTier2 <= 0 || ram2 < 8) { icon = "❌"; color = "#ef4444"; msg = "Cấu hình yếu – khó chạy game AAA hiện đại."; }
-      else if (userGpuTier2 <= 2 || ram2 <= 8) { icon = "⚠️"; color = "#f59e0b"; msg = "Cấu hình tối thiểu – chỉnh Low settings."; }
-      pcAssess.innerHTML = `
-        <div style="font-weight:700;color:${color};font-size:14px;">${icon} ${msg}</div>
-        <div style="color:var(--text-muted);font-size:11px;margin-top:4px;">⚠️ Không lấy được yêu cầu cụ thể từ Steam cho game này.</div>
-      `;
-    }
-  }
-
-  gpuSelect?.addEventListener("change", fetchAndEvaluateSpecs);
-  cpuSelect?.addEventListener("change", fetchAndEvaluateSpecs);
-  ramSelect?.addEventListener("change", fetchAndEvaluateSpecs);
-  fetchAndEvaluateSpecs();
+  if (!bundleResult || !targetId) return;
+  fetchBundleData(targetId);
 
   async function fetchBundleData(id) {
-    if (!bundleResult || !id) return;
-    bundleResult.innerHTML = `<div style="text-align:center; padding:10px;">🔄 Đang lấy thông tin gói Bundle & DLC...</div>`;
+    bundleResult.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;color:var(--text-muted);padding:8px 0;">
+        <span style="font-size:18px;animation:spin 1s linear infinite;display:inline-block;">⚙️</span>
+        <span>Đang phân tích Bundle & DLC từ Steam Store...</span>
+      </div>`;
     try {
       const res = await fetch(`/api/bundle/savings/${id}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Không thể lấy thông tin Bundle");
+      if (!res.ok) throw new Error(data.error || "Lỗi API");
 
-      if (!data.packages || !data.packages.length) {
-        bundleResult.innerHTML = `<div style="color:var(--text-muted);">Game này không có gói Bundle/Package ưu đãi mua kèm.</div>`;
-        return;
+      const s = data.summary || {};
+      const pkgs = data.packages || [];
+      const dlcs = data.dlcs || [];
+      const paidDlcs = dlcs.filter(d => d.price && !d.isFree);
+      const freeDlcs = dlcs.filter(d => d.isFree || !d.price);
+
+      // ---- HEADER: game + counts ----
+      let html = `
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
+          ${data.headerImage ? `<img src="${data.headerImage}" style="width:80px;border-radius:6px;flex-shrink:0;" loading="lazy">` : ''}
+          <div>
+            <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:4px;">${data.name || ''}</div>
+            <div style="font-size:11px;color:var(--text-muted);display:flex;gap:10px;flex-wrap:wrap;">
+              ${data.gamePrice ? `<span>🎮 Base: <b>${data.gamePrice.formatted}</b>${data.gamePrice.discountPct > 0 ? ` <span style="color:#22c55e;">-${data.gamePrice.discountPct}%</span>` : ''}</span>` : ''}
+              <span>📦 ${data.packagesCount} gói Package</span>
+              <span>🧩 ${data.dlcCount} DLC${data.dlcFetched < data.dlcCount ? ` (hiển thị ${data.dlcFetched})` : ''}</span>
+            </div>
+          </div>
+        </div>`;
+
+      // ---- SAVINGS BANNER ----
+      if (s.savingsPct > 0 && s.savingsFormatted) {
+        html += `
+          <div style="background:linear-gradient(135deg,#16a34a22,#16a34a11);border:1px solid #22c55e55;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:700;color:#22c55e;margin-bottom:6px;">
+              💰 Tiết kiệm ${s.savingsPct}% khi mua Bundle!
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+              <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                <div style="color:var(--text-muted);font-size:10px;margin-bottom:2px;">Mua lẻ tất cả</div>
+                <div style="font-weight:700;color:#ef4444;font-size:14px;text-decoration:line-through;">${s.buyAllSeparateFormatted}</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.2);border-radius:6px;padding:8px;text-align:center;">
+                <div style="color:var(--text-muted);font-size:10px;margin-bottom:2px;">Mua Bundle tốt nhất</div>
+                <div style="font-weight:700;color:#22c55e;font-size:14px;">${s.bestBundlePriceFormatted}</div>
+              </div>
+            </div>
+            <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text-muted);">
+              Tiết kiệm được: <b style="color:#22c55e;">${s.savingsFormatted}</b>
+            </div>
+          </div>`;
+      } else if (s.buyAllSeparateFormatted && !s.bestBundlePriceFormatted) {
+        html += `<div style="font-size:12px;color:var(--text-muted);padding:8px;background:var(--bg-primary);border-radius:6px;margin-bottom:12px;">
+          ℹ️ Game này không có gói Bundle tích hợp. Mua lẻ từng DLC.
+          ${s.dlcTotalFormatted ? `Tổng DLC: <b>${s.dlcTotalFormatted}</b>` : ''}
+        </div>`;
       }
 
-      bundleResult.innerHTML = `
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Có <strong>${data.packagesCount}</strong> gói Package & <strong>${data.dlcCount}</strong> DLCs từ Steam:</div>
-        ${data.packages.map(p => `
-          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-elevated); padding:8px 10px; border-radius:4px; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600;">${p.optionText}</span>
-            ${p.discountPercent > 0 ? `<span style="font-weight:700; color:var(--success); font-size:12px;">Tiết kiệm -${p.discountPercent}%</span>` : '<span style="font-size:11px; color:var(--text-muted);">Giá niêm yết</span>'}
+      // ---- PACKAGE OPTIONS ----
+      if (pkgs.length) {
+        html += `<div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📦 Các gói mua có sẵn</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            ${pkgs.map(p => `
+              <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;">
+                <span style="font-size:12px;font-weight:500;color:var(--text-primary);">${p.optionText || 'Gói đơn lẻ'}</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  ${p.discountPercent > 0 ? `<span style="background:#22c55e;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">-${p.discountPercent}%</span>` : ''}
+                  <span style="font-weight:700;font-size:13px;color:${p.discountPercent > 0 ? '#22c55e' : 'var(--text-primary)'};">${p.formattedPrice || '—'}</span>
+                </div>
+              </div>`).join('')}
           </div>
-        `).join("")}
-      `;
+        </div>`;
+      }
+
+      // ---- DLC LIST ----
+      if (paidDlcs.length) {
+        html += `<div style="margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+            🧩 ${paidDlcs.length} DLC trả phí${s.dlcTotalFormatted ? ` — tổng <b style="color:var(--text-primary);">${s.dlcTotalFormatted}</b>` : ''}
+          </div>
+          <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;">
+            ${paidDlcs.map(d => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg-primary);border-radius:5px;font-size:11px;">
+                <span style="color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px;">${d.name}</span>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                  ${d.price.discountPct > 0 ? `
+                    <span style="color:var(--text-muted);text-decoration:line-through;font-size:10px;">${d.price.originalFormatted}</span>
+                    <span style="background:#22c55e;color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;">-${d.price.discountPct}%</span>
+                    <span style="font-weight:700;color:#22c55e;">${d.price.formatted}</span>
+                  ` : `<span style="font-weight:600;color:var(--text-primary);">${d.price.formatted}</span>`}
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }
+
+      if (freeDlcs.length) {
+        html += `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🎁 ${freeDlcs.length} DLC miễn phí đi kèm (${freeDlcs.map(d=>d.name).slice(0,3).join(', ')}${freeDlcs.length > 3 ? '...' : ''})</div>`;
+      }
+
+      if (!pkgs.length && !dlcs.length) {
+        html += `<div style="text-align:center;color:var(--text-muted);padding:16px;font-size:13px;">
+          😔 Game này chưa có Bundle hay DLC nào trên Steam.
+        </div>`;
+      }
+
+      bundleResult.innerHTML = html;
     } catch (e) {
-      bundleResult.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Game này chưa có gói Bundle ưu đãi bổ sung.</div>`;
+      bundleResult.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px;">
+        ⚠️ Không thể tải dữ liệu Bundle & DLC: ${e.message}
+      </div>`;
     }
   }
 }

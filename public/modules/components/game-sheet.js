@@ -225,12 +225,19 @@ export class GameSheet {
         regions: base.comparisonRegions,
         currency: 'VND'
       });
-      this.selected = { ...base, ...steamService.normalizePriceData(base, response) };
+      this.selected = { ...base, ...steamService.normalizePriceData(base, response), steamVerified: true };
     } catch (error) {
-      this.selected = {
-        ...base,
-        errorData: { message: error.message, occurredAt: new Date().toISOString() }
-      };
+      this.body.innerHTML = `
+        <div class="tp-inline-error">
+          <strong>Không thể thêm game này.</strong>
+          <span>${escapeHtml(error.message || 'App ID không tồn tại trên Steam Store.')}</span>
+          <button type="button" data-retry-selection>Thử lại</button>
+        </div>
+      `;
+      this.footer.innerHTML = '<button type="button" class="tp-button-secondary" data-sheet-action="back">Quay lại</button>';
+      this.body.querySelector('[data-retry-selection]')?.addEventListener('click', () => this._selectResult(result));
+      this.footer.querySelector('[data-sheet-action="back"]')?.addEventListener('click', () => this._renderSearch());
+      return;
     }
     this._renderSetup(this.selected);
   }
@@ -361,6 +368,10 @@ export class GameSheet {
     const comparisonRegions = data.getAll('comparisonRegions').map(String);
     const errors = {};
 
+    if (this.mode !== 'edit' && !game.steamVerified) {
+      errors.game = 'Game chưa được Steam xác thực nên không thể lưu.';
+    }
+
     if (targetAmount !== null && (!Number.isFinite(targetAmount) || targetAmount < 0)) {
       errors.targetAmount = 'Giá mục tiêu phải là số không âm.';
     }
@@ -370,6 +381,12 @@ export class GameSheet {
       element.textContent = errors[element.dataset.errorFor] || '';
     });
     if (Object.keys(errors).length) {
+      if (errors.game) {
+        const inline = document.createElement('p');
+        inline.className = 'tp-form-submit-error';
+        inline.textContent = errors.game;
+        form.prepend(inline);
+      }
       const firstField = form.querySelector(`[name="${Object.keys(errors)[0]}"]`);
       firstField?.focus();
       return;

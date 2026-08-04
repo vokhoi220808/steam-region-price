@@ -45,3 +45,49 @@ test("cloud migration keeps public access locked and adds reliability tables", a
   }
   assert.doesNotMatch(migration, /create\s+policy/i);
 });
+
+test("comparison validation, progressive rendering and share previews are wired", async () => {
+  const [server, client, steamService, gameSheet, vercel] = await Promise.all([
+    readFile(new URL("server.js", root), "utf8"),
+    readFile(new URL("public/app.js", root), "utf8"),
+    readFile(new URL("public/modules/services/steam-service.js", root), "utf8"),
+    readFile(new URL("public/modules/components/game-sheet.js", root), "utf8"),
+    readFile(new URL("vercel.json", root), "utf8")
+  ]);
+  assert.match(server, /\/api\/compare-stream\/\:appId/);
+  assert.match(server, /App ID không tồn tại trên Steam Store/);
+  assert.match(server, /app\.get\("\/game\/\:appId"/);
+  assert.match(server, /property="og:title"/);
+  assert.match(client, /fetchComparisonStream/);
+  assert.match(client, /steamVerified/);
+  assert.match(client, /url\.pathname = `\/game\/\$\{appId\}`/);
+  assert.match(steamService, /if \(!payload\?\.gameName\)/);
+  assert.match(gameSheet, /Game chưa được Steam xác thực/);
+  assert.equal(JSON.parse(vercel).rewrites.some((rule) => rule.source === "/game/:path*"), true);
+});
+
+test("production readiness reports missing mandatory configuration without leaking secrets", async () => {
+  const { getProductionReadiness } = await import(new URL("server/reliability.js", root));
+  const previous = Object.fromEntries([
+    "PUBLIC_BASE_URL", "SESSION_SECRET", "STEAM_API_KEY", "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET"
+  ].map((name) => [name, process.env[name]]));
+  try {
+    process.env.PUBLIC_BASE_URL = "https://steam.example.com";
+    process.env.SESSION_SECRET = "a".repeat(32);
+    process.env.STEAM_API_KEY = "steam-key";
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+    process.env.CRON_SECRET = "c".repeat(24);
+    const readiness = getProductionReadiness();
+    assert.equal(readiness.ready, true);
+    assert.deepEqual(readiness.missing, []);
+    assert.equal(JSON.stringify(readiness).includes("steam-key"), false);
+    assert.equal(JSON.stringify(readiness).includes("service-key"), false);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

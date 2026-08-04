@@ -8,6 +8,26 @@ function redisConfig() {
   return { url: String(process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/$/, ""), token: String(process.env.UPSTASH_REDIS_REST_TOKEN || "") };
 }
 
+export function getProductionReadiness() {
+  const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || "");
+  const sessionSecret = String(process.env.SESSION_SECRET || "");
+  const checks = {
+    publicBaseUrl: /^https:\/\//i.test(publicBaseUrl),
+    sessionSecret: sessionSecret.length >= 32 && !sessionSecret.startsWith("replace-with"),
+    steamApi: Boolean(process.env.STEAM_API_KEY),
+    supabase: cloudDatabaseConfigured(),
+    cronSecret: String(process.env.CRON_SECRET || "").length >= 24
+  };
+  const optional = {
+    redis: Boolean(redisConfig().url && redisConfig().token),
+    webPush: pushConfigured(),
+    email: Boolean(process.env.RESEND_API_KEY && process.env.ALERT_FROM_EMAIL),
+    admin: Boolean(process.env.ADMIN_TOKEN || process.env.ADMIN_STEAM_IDS)
+  };
+  const missing = Object.entries(checks).filter(([, ready]) => !ready).map(([name]) => name);
+  return { ready: missing.length === 0, checks, optional, missing };
+}
+
 export async function redisCommand(...command) {
   const cfg = redisConfig();
   if (!cfg.url || !cfg.token) return null;
@@ -79,6 +99,14 @@ function adminOnly(req, res, next) {
 
 export function createReliabilityRouter({ cacheStats, cacheSize }) {
   const router = express.Router();
+  router.get("/readiness", (_req, res) => {
+    const readiness = getProductionReadiness();
+    res.status(readiness.ready ? 200 : 503).json({
+      status: readiness.ready ? "ready" : "configuration_required",
+      checkedAt: new Date().toISOString(),
+      ...readiness
+    });
+  });
   router.get("/health", async (_req, res) => {
     let services = cloudDatabaseConfigured() ? await supabaseRequest("service_health?select=*&order=service.asc").catch(() => []) : [];
     if (!services.some((s) => s.service === "steam_api")) {

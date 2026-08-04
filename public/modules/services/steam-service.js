@@ -27,9 +27,10 @@ export class SteamService {
           currency: 'VND',
           signal: this.searchController.signal
         });
+        if (!detail.gameName) return [];
         return [{
           appId: directAppId,
-          name: detail.gameName || `Steam App ${directAppId}`,
+          name: detail.gameName,
           headerImage: detail.image || '',
           currentPrice: detail.prices?.find((price) => price.code === 'vn')?.convertedValue ?? null,
           discount: detail.prices?.find((price) => price.code === 'vn')?.discountPercent || 0
@@ -68,8 +69,13 @@ export class SteamService {
       `/api/compare/${appId}?currency=${encodeURIComponent(currency)}&regions=${regions.join(',')}`,
       { signal }
     );
-    if (!response.ok) throw new Error('Chưa thể cập nhật giá game này.');
-    return response.json();
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || 'Chưa thể cập nhật giá game này.');
+    }
+    const payload = await response.json();
+    if (!payload?.gameName) throw new Error('App ID không tồn tại trên Steam Store.');
+    return payload;
   }
 
   normalizePriceData(game, response) {

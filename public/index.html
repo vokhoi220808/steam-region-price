@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <meta name="theme-color" content="#0b1320" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -44,7 +45,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.373 1.203-.594 1.913-.594.108 0 .212.012.318.022l3.065-4.447v-.06c0-2.107 1.708-3.816 3.816-3.816s3.816 1.709 3.816 3.816-1.708 3.816-3.816 3.816h-.086l-4.367 3.111c.01.101.02.203.02.308 0 1.986-1.503 3.62-3.441 3.799l-2.457 5.945C3.896 23.491 7.697 24 11.979 24c6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg>
           <span>Đăng nhập Steam</span>
         </button>
-        <select id="globalRegionSelect" class="header-region-select" title="Chọn quốc gia / tiền tệ">
+        <select id="globalRegionSelect" class="header-region-select" title="Chọn khu vực và tiền tệ hiển thị" aria-label="Chọn khu vực và tiền tệ hiển thị">
           <option value="VN">VN (VND)</option>
           <option value="US">US (USD)</option>
           <option value="DE">EU (EUR)</option>
@@ -759,82 +760,14 @@
       <p class="history-note-real" data-i18n="history_note_real" style="margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center;">* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại.</p>
       <p class="history-note-simulated hidden">Dữ liệu mô phỏng từ mức giá hiện tại, chỉ dùng để xem thử xu hướng và không phải lịch sử giá Steam.</p>
 
-      <!-- INLINE PC SPECS & BUNDLE TOOLS -->
+      <!-- BUNDLE & DLC TOOL -->
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <button id="tabPcSpecsBtn" class="btn btn-primary btn-small" style="flex:1; font-weight:600;">🖥️ Cấu hình PC</button>
-          <button id="tabBundleSavingsBtn" class="btn btn-secondary btn-small" style="flex:1; font-weight:600;">📦 Bundle & DLC</button>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <span style="font-weight:700; font-size:13px;">📦 Phân Tích Bundle & DLC</span>
+          <span style="font-size:11px; color:var(--text-muted);">Dữ liệu live từ Steam Store</span>
         </div>
-        <!-- PC Specs Tab -->
-        <div id="pcSpecsTabContent">
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
-            <select id="userGpuSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
-              <optgroup label="🔴 NVIDIA – Cao cấp">
-                <option value="rtx4090">RTX 4090</option>
-                <option value="rtx4080">RTX 4080</option>
-                <option value="rtx4070">RTX 4070 Ti / 4070</option>
-                <option value="rtx4060">RTX 4060 Ti / 4060</option>
-              </optgroup>
-              <optgroup label="🔴 NVIDIA – Tầm trung">
-                <option value="rtx3080">RTX 3080 / 3070</option>
-                <option value="rtx3060" selected>RTX 3060 Ti / 3060</option>
-                <option value="rtx2060">RTX 2060 / 2070</option>
-                <option value="gtx1080">GTX 1080 Ti / 1080</option>
-              </optgroup>
-              <optgroup label="🔴 NVIDIA – Tối thiểu">
-                <option value="gtx1650">GTX 1660 / 1650 Super</option>
-                <option value="gtx1050ti">GTX 1050 Ti / 1060 3GB</option>
-                <option value="gtx1050">GTX 1050 / 960</option>
-              </optgroup>
-              <optgroup label="🔵 AMD">
-                <option value="rx7900">RX 7900 XTX / 7900 XT</option>
-                <option value="rx7700">RX 7700 XT / 7600</option>
-                <option value="rx6700">RX 6700 XT / 6800</option>
-                <option value="rx6600">RX 6600 / 6500</option>
-                <option value="rx580">RX 580 / 5500 XT</option>
-              </optgroup>
-              <optgroup label="🟦 Intel Arc">
-                <option value="arc770">Intel Arc A770 / A750</option>
-                <option value="arc380">Intel Arc A380</option>
-              </optgroup>
-              <optgroup label="⚪ Laptop / iGPU">
-                <option value="rtx4060m">RTX 4060 Laptop / 3060 Laptop</option>
-                <option value="rtx3050m">RTX 3050 Laptop / GTX 1650 Laptop</option>
-                <option value="igpu">Intel Iris Xe / iGPU (Yếu)</option>
-              </optgroup>
-            </select>
-            <select id="userCpuSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
-              <optgroup label="AMD Ryzen">
-                <option value="ryzen9">Ryzen 9 7900X / 5900X</option>
-                <option value="ryzen7">Ryzen 7 7700 / 5700X</option>
-                <option value="ryzen5" selected>Ryzen 5 5600 / 7600</option>
-                <option value="ryzen3">Ryzen 3 4100 / 3300X</option>
-              </optgroup>
-              <optgroup label="Intel Core">
-                <option value="i9">Core i9-13900K / 12900K</option>
-                <option value="i7">Core i7-13700 / 12700</option>
-                <option value="i5">Core i5-13600 / 12400</option>
-                <option value="i3">Core i3-12100 / 10100</option>
-              </optgroup>
-              <optgroup label="Cũ / Yếu">
-                <option value="i5old">Core i5-6600 / Ryzen 5 1600</option>
-                <option value="i3old">Core i3-8100 / Athlon 3000G</option>
-              </optgroup>
-            </select>
-            <select id="userRamSelect" style="height:34px; padding:0 6px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:11px;">
-              <option value="64">RAM 64 GB</option>
-              <option value="32">RAM 32 GB</option>
-              <option value="16" selected>RAM 16 GB</option>
-              <option value="12">RAM 12 GB</option>
-              <option value="8">RAM 8 GB</option>
-              <option value="4">RAM 4 GB</option>
-            </select>
-          </div>
-          <div id="pcHardwareAssessment" style="padding:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--text-secondary);">Chọn GPU / CPU / RAM để đánh giá...</div>
-        </div>
-        <!-- Bundle Tab -->
-        <div id="bundleSavingsTabContent" style="display:none;">
-          <div id="bundleSavingsResult" style="padding:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px;">Đang quét Bundle & DLC từ Steam...</div>
+        <div id="bundleSavingsTabContent">
+          <div id="bundleSavingsResult" style="font-size:13px; color:var(--text-secondary);">Đang tải dữ liệu Bundle & DLC từ Steam...</div>
         </div>
       </div>
     </div>
@@ -920,7 +853,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="modules/tracker/tracker-page.js?v=22"></script>
   <script type="module" src="modules/account/account-manager.js?v=3"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
   <!-- Footer -->
 <style>
 .site-footer{

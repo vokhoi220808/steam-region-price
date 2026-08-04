@@ -214,12 +214,21 @@ node --test
 | `/api/history/internal/:appId` | `GET` | Lấy biểu đồ lịch sử snapshot & dự đoán sale |
 | `/api/push/subscribe` | `POST` | Đăng ký nhận thông báo trình duyệt Web Push |
 | `/api/health` | `GET` | Kiểm tra tình trạng sức khỏe dịch vụ hệ thống |
+| `/api/readiness` | `GET` | Kiểm tra các biến môi trường bắt buộc trước khi đưa production |
 | `/api/admin/status` | `GET` | Dashboard quản trị hệ thống (yêu cầu admin) |
 | `/api/cron/check-alerts` | `GET/POST` | Endpoint cron tự động quét giá và gửi cảnh báo |
 
 ---
 
 ## 🚀 Hướng dẫn Deploy
+
+### Deploy trên Vercel
+
+1. Import repository vào Vercel và giữ nguyên cấu hình trong `vercel.json`.
+2. Khai báo toàn bộ biến bắt buộc: `PUBLIC_BASE_URL`, `SESSION_SECRET`, `STEAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
+3. Nên cấu hình thêm Upstash Redis, VAPID Web Push và Resend để bật đầy đủ cache và thông báo.
+4. Sau khi deploy, mở `/api/readiness`. Chỉ đưa bản build vào sử dụng khi endpoint trả `200` với `status: "ready"`.
+5. Kiểm tra một URL `/game/<APP_ID>` để xác nhận OpenGraph động hoạt động khi chia sẻ qua Discord/Facebook.
 
 ### Deploy trên Render / Railway / Server riêng
 1. Kết nối repository GitHub với nền tảng Cloud của bạn.

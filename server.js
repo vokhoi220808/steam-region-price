@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { createHash, timingSafeEqual } from "node:crypto";
 import "dotenv/config";
 import {
@@ -429,6 +430,108 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
+function normalizeComparedPrice(item, rates) {
+  let convertedValue = null;
+  if (item.available && !item.isFree && rates && item.currency) {
+    const rate = rates[item.currency];
+    if (Number.isFinite(rate) && rate > 0) convertedValue = item.final / rate;
+  } else if (item.isFree) {
+    convertedValue = 0;
+  }
+  return { ...item, convertedValue };
+}
+
+app.get("/api/compare-stream/:appId", async (req, res) => {
+  const appId = req.params.appId;
+  if (!/^\d+$/.test(appId)) {
+    return res.status(400).json({ error: "Steam App ID không hợp lệ." });
+  }
+
+  const targetCurrency = String(req.query.currency || "VND").toUpperCase();
+  const productType = String(req.query.type || "app").toLowerCase() === "sub" ? "sub" : "app";
+  const language = String(req.query.lang || "vi").toLowerCase() === "en" ? "english" : "vietnamese";
+  const requestedCodes = String(req.query.regions || "")
+    .split(",")
+    .map((code) => code.trim().toLowerCase())
+    .filter(Boolean);
+  const selectedRegions = requestedCodes.length
+    ? REGIONS.filter((region) => requestedCodes.includes(region.code))
+    : REGIONS;
+
+  if (!selectedRegions.length) {
+    return res.status(400).json({ error: "Không có vùng hợp lệ được chọn." });
+  }
+
+  res.status(200);
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.flushHeaders?.();
+  const writeEvent = (payload) => {
+    if (!res.destroyed && !res.writableEnded) res.write(`${JSON.stringify(payload)}\n`);
+  };
+
+  try {
+    const prices = [];
+    const ratesPromise = getExchangeRates(targetCurrency);
+    await mapWithConcurrency(selectedRegions, 4, async (region) => {
+      const [rawPrice, rates] = await Promise.all([
+        productType === "sub"
+          ? getRegionalPackagePrice(appId, region, language)
+          : getRegionalPrice(appId, region, language),
+        ratesPromise
+      ]);
+      const price = normalizeComparedPrice(rawPrice, rates);
+      prices.push(price);
+      writeEvent({ type: "price", price, completed: prices.length, total: selectedRegions.length });
+      return price;
+    });
+
+    const firstValue = (field) => prices.find((item) => item[field])?.[field] || null;
+    const gameName = firstValue("gameName");
+    if (!gameName) {
+      writeEvent({
+        type: "error",
+        status: 404,
+        error: productType === "sub"
+          ? "Package ID không tồn tại trên Steam Store."
+          : "App ID không tồn tại trên Steam Store."
+      });
+      return res.end();
+    }
+
+    const packageSeed = productType === "sub"
+      ? prices.find((item) => item.available && item.includedApps?.length)
+      : null;
+    const packageMetadata = packageSeed
+      ? await getPackageMetadata(appId, packageSeed.includedApps, language)
+      : null;
+    const rates = await ratesPromise;
+    writeEvent({
+      type: "complete",
+      data: {
+        appId: Number(appId),
+        productType,
+        gameName,
+        image: firstValue("image"),
+        developer: firstValue("developer") || packageMetadata?.developer || null,
+        publisher: firstValue("publisher") || packageMetadata?.publisher || null,
+        releaseDate: firstValue("releaseDate") || packageMetadata?.releaseDate || null,
+        genres: packageMetadata?.genres || firstValue("genres"),
+        shortDescription: firstValue("shortDescription") || packageMetadata?.shortDescription || null,
+        includedApps: firstValue("includedApps") || [],
+        fxAvailable: Boolean(rates),
+        checkedAt: new Date().toISOString()
+      }
+    });
+    res.end();
+  } catch (error) {
+    writeEvent({ type: "error", status: 502, error: "Không thể lấy dữ liệu giá từ Steam lúc này." });
+    res.end();
+    console.error("Compare stream error:", error.message);
+  }
+});
+
 app.get("/api/compare/:appId", async (req, res) => {
   const appId = req.params.appId;
   if (!/^\d+$/.test(appId)) {
@@ -468,18 +571,7 @@ app.get("/api/compare/:appId", async (req, res) => {
     ? await getPackageMetadata(appId, packageSeed.includedApps, language)
     : null;
 
-  const normalized = prices.map((item) => {
-    let convertedValue = null;
-    if (item.available && !item.isFree && rates && item.currency) {
-      const rate = rates[item.currency];
-      if (Number.isFinite(rate) && rate > 0) {
-        convertedValue = item.final / rate;
-      }
-    } else if (item.isFree) {
-      convertedValue = 0;
-    }
-    return { ...item, convertedValue };
-  });
+  const normalized = prices.map((item) => normalizeComparedPrice(item, rates));
 
   const ranked = normalized
     .filter((item) => item.available && Number.isFinite(item.convertedValue))
@@ -495,10 +587,18 @@ app.get("/api/compare/:appId", async (req, res) => {
   }));
 
   const firstValue = (field) => enriched.find((item) => item[field])?.[field] || null;
+  const gameName = firstValue("gameName");
+  if (!gameName) {
+    return res.status(404).json({
+      error: productType === "sub"
+        ? "Package ID không tồn tại trên Steam Store."
+        : "App ID không tồn tại trên Steam Store."
+    });
+  }
   res.json({
     appId: Number(appId),
     productType,
-    gameName: firstValue("gameName"),
+    gameName,
     image: firstValue("image"),
     developer: firstValue("developer") || packageMetadata?.developer || null,
     publisher: firstValue("publisher") || packageMetadata?.publisher || null,
@@ -960,30 +1060,108 @@ app.get('/api/bundle/savings/:appId', async (req, res, next) => {
   try {
     const appId = Number(req.params.appId);
     if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: "App ID không hợp lệ." });
-    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=vn&l=vietnamese`, { signal: AbortSignal.timeout(10000) });
+
+    // Fetch main game data
+    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&cc=vn&l=vietnamese&filters=basic,packages,dlc,price_overview,package_groups`, { signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error("Steam API Error");
     const json = await response.json();
     const appData = json?.[appId]?.data;
     if (!appData) return res.status(404).json({ error: "Không tìm thấy thông tin game trên Steam." });
 
     const packages = appData.package_groups?.[0]?.subs || [];
-    const dlcIds = appData.dlc || [];
-    
+    const dlcIds = (appData.dlc || []).slice(0, 15); // Cap at 15 DLCs to avoid rate limits
+    const gamePrice = appData.price_overview;
+
+    // Fetch DLC details in parallel (batched)
+    let dlcDetails = [];
+    if (dlcIds.length > 0) {
+      const dlcChunks = [];
+      for (let i = 0; i < dlcIds.length; i += 5) dlcChunks.push(dlcIds.slice(i, i + 5));
+      for (const chunk of dlcChunks) {
+        const ids = chunk.join(',');
+        try {
+          const dlcRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${ids}&cc=vn&filters=basic,price_overview&l=vietnamese`, { signal: AbortSignal.timeout(8000) });
+          const dlcJson = await dlcRes.json();
+          for (const id of chunk) {
+            const d = dlcJson?.[id]?.data;
+            if (d) dlcDetails.push({
+              appId: id,
+              name: d.name,
+              isFree: d.is_free,
+              price: d.price_overview ? {
+                final: d.price_overview.final,          // in VND cents
+                initial: d.price_overview.initial,
+                discountPct: d.price_overview.discount_percent,
+                formatted: d.price_overview.final_formatted,
+                originalFormatted: d.price_overview.initial_formatted
+              } : null
+            });
+          }
+        } catch (_) { /* skip chunk on error */ }
+      }
+    }
+
+    // Calculate totals
+    const paidDlcs = dlcDetails.filter(d => d.price && !d.isFree);
+    const dlcTotalFinal = paidDlcs.reduce((s, d) => s + d.price.final, 0);
+    const dlcTotalOriginal = paidDlcs.reduce((s, d) => s + d.price.initial, 0);
+    const gameFinal = gamePrice?.final || 0;
+    const gameOriginal = gamePrice?.initial || gameFinal;
+
+    // Best bundle price (lowest package price that includes base game)
+    const fullBundle = packages.find(p => p.priceInCents != null) || packages[0];
+    const bundlePrice = fullBundle ? fullBundle.priceInCents : 0;
+    const buyAllSeparate = gameFinal + dlcTotalFinal;
+    const savings = buyAllSeparate > 0 && bundlePrice > 0 ? buyAllSeparate - bundlePrice : 0;
+    const savingsPct = buyAllSeparate > 0 && savings > 0 ? Math.round((savings / buyAllSeparate) * 100) : 0;
+
+    const fmt = (cents) => {
+      if (!cents) return null;
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(cents);
+    };
+
     res.json({
       success: true,
       appId,
       name: appData.name,
       isFree: appData.is_free,
       headerImage: appData.header_image,
+      // Game base price
+      gamePrice: gamePrice ? {
+        final: gameFinal,
+        original: gameOriginal,
+        discountPct: gamePrice.discount_percent,
+        formatted: gamePrice.final_formatted,
+        originalFormatted: gamePrice.initial_formatted
+      } : null,
+      // Packages (bundle options)
       packagesCount: packages.length,
-      dlcCount: dlcIds.length,
       packages: packages.map(p => ({
         packageId: p.packageid,
         optionText: p.option_text,
         priceInCents: p.price_in_cents_with_discount,
-        discountPercent: p.percent_savings
+        discountPercent: p.percent_savings,
+        formattedPrice: fmt(p.price_in_cents_with_discount)
       })),
-      pcRequirements: appData.pc_requirements || {}
+      // DLC breakdown
+      dlcCount: dlcIds.length,
+      dlcFetched: dlcDetails.length,
+      dlcs: dlcDetails,
+      // Smart savings summary
+      summary: {
+        buyAllSeparate: buyAllSeparate,
+        buyAllSeparateFormatted: fmt(buyAllSeparate),
+        bestBundlePrice: bundlePrice,
+        bestBundlePriceFormatted: fmt(bundlePrice),
+        savings: savings,
+        savingsFormatted: fmt(savings),
+        savingsPct,
+        dlcTotalFinal,
+        dlcTotalFormatted: fmt(dlcTotalFinal),
+        dlcTotalOriginal,
+        paidDlcCount: paidDlcs.length,
+        freeDlcCount: dlcDetails.length - paidDlcs.length
+      }
     });
   } catch (error) { next(error); }
 });
@@ -1009,6 +1187,55 @@ async function handleWeeklyDigestCron(req, res) {
 
 app.get('/api/cron/weekly-digest', handleWeeklyDigestCron);
 app.post('/api/cron/weekly-digest', handleWeeklyDigestCron);
+
+function escapeHtmlAttribute(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+app.get("/game/:appId", async (req, res, next) => {
+  const appId = String(req.params.appId || "");
+  if (!/^\d+$/.test(appId)) return next();
+
+  try {
+    const [html, quote] = await Promise.all([
+      readFile(path.join(__dirname, "public", "index.html"), "utf8"),
+      getRegionalPrice(appId, REGIONS.find((region) => region.code === "vn"), "vietnamese")
+    ]);
+    const productName = quote?.gameName;
+    if (!productName) return res.status(404).send(html);
+
+    const configuredBase = String(process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+    const requestBase = `${req.protocol}://${req.get("host")}`;
+    const canonicalUrl = `${configuredBase || requestBase}/game/${appId}`;
+    const priceText = quote.isFree ? "Miễn phí" : (quote.finalFormatted || "xem giá theo khu vực");
+    const title = `${productName} – So sánh giá Steam theo khu vực`;
+    const description = `${productName} hiện có giá ${priceText} tại Việt Nam. So sánh giá Steam giữa nhiều khu vực và tìm mức giá tốt nhất.`;
+    const image = quote.image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+    const metaTags = `
+    <link rel="canonical" href="${escapeHtmlAttribute(canonicalUrl)}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Steam Region Price">
+    <meta property="og:title" content="${escapeHtmlAttribute(title)}">
+    <meta property="og:description" content="${escapeHtmlAttribute(description)}">
+    <meta property="og:url" content="${escapeHtmlAttribute(canonicalUrl)}">
+    <meta property="og:image" content="${escapeHtmlAttribute(image)}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escapeHtmlAttribute(title)}">
+    <meta name="twitter:description" content="${escapeHtmlAttribute(description)}">
+    <meta name="twitter:image" content="${escapeHtmlAttribute(image)}">`;
+    const rendered = html
+      .replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtmlAttribute(title)}</title>`)
+      .replace("</head>", `${metaTags}\n  </head>`);
+    res.setHeader("Cache-Control", "public, max-age=900, stale-while-revalidate=3600");
+    res.type("html").send(rendered);
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use("/api", createReliabilityRouter({ cacheStats, cacheSize: () => cache.size }));
 
