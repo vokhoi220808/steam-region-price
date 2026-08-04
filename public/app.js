@@ -2747,6 +2747,64 @@ window.toggleTrackGame = toggleTrackGame;
 // 4 REALTIME ADVANCED FEATURES IMPLEMENTATION
 // ==========================================
 
+// GLOBAL DELEGATE EVENT LISTENER FOR FEATURE MODALS
+document.addEventListener("click", (e) => {
+  const budgetBtn = e.target.closest("#openBudgetComboBtn");
+  if (budgetBtn) {
+    e.preventDefault();
+    const modal = document.getElementById("budgetComboModal");
+    if (modal) {
+      modal.classList.remove("hidden");
+      modal.classList.add("show");
+      const input = document.getElementById("budgetComboInput");
+      if (input && !input.value) input.value = "150000";
+      document.getElementById("runBudgetComboBtn")?.click();
+    }
+    return;
+  }
+
+  const coopBtn = e.target.closest("#openCoopWishlistBtn");
+  if (coopBtn) {
+    e.preventDefault();
+    const modal = document.getElementById("coopWishlistModal");
+    if (modal) {
+      modal.classList.remove("hidden");
+      modal.classList.add("show");
+    }
+    return;
+  }
+
+  const realCostBtn = e.target.closest("#openRealCostBtn");
+  if (realCostBtn) {
+    e.preventDefault();
+    const modal = document.getElementById("realCostModal");
+    if (modal) {
+      modal.classList.remove("hidden");
+      modal.classList.add("show");
+      const baseInput = document.getElementById("realCostBasePrice");
+      if (baseInput) baseInput.dispatchEvent(new Event("input"));
+    }
+    return;
+  }
+
+  if (e.target.closest("#closeBudgetComboModal") || e.target === document.getElementById("budgetComboModal")) {
+    const modal = document.getElementById("budgetComboModal");
+    if (modal) { modal.classList.add("hidden"); modal.classList.remove("show"); }
+  }
+  if (e.target.closest("#closeCoopWishlistModal") || e.target === document.getElementById("coopWishlistModal")) {
+    const modal = document.getElementById("coopWishlistModal");
+    if (modal) { modal.classList.add("hidden"); modal.classList.remove("show"); }
+  }
+  if (e.target.closest("#closeRealCostModal") || e.target === document.getElementById("realCostModal")) {
+    const modal = document.getElementById("realCostModal");
+    if (modal) { modal.classList.add("hidden"); modal.classList.remove("show"); }
+  }
+  if (e.target.closest("#closeEmbedModal") || e.target === document.getElementById("embedModal")) {
+    const modal = document.getElementById("embedModal");
+    if (modal) { modal.classList.add("hidden"); modal.classList.remove("show"); }
+  }
+});
+
 // 1. BUDGET COMBO FINDER (Knapsack Subset Sum Algorithm)
 function initBudgetComboModal() {
   const modal = document.getElementById("budgetComboModal");
@@ -2756,7 +2814,7 @@ function initBudgetComboModal() {
   const input = document.getElementById("budgetComboInput");
   const results = document.getElementById("budgetComboResults");
 
-  if (!modal || !openBtn) return;
+  if (!modal) return;
 
   openBtn.addEventListener("click", () => {
     modal.classList.remove("hidden");

@@ -595,11 +595,15 @@ select option {
   box-shadow: 0 20px 40px rgba(0,0,0,0.3);
   overflow: hidden;
 }
-.modal.show {
-  display: flex;
-  flex-direction: column;
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+.modal.show,
+#budgetComboModal:not(.hidden),
+#coopWishlistModal:not(.hidden),
+#realCostModal:not(.hidden),
+#embedModal:not(.hidden) {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 .modal-header {
