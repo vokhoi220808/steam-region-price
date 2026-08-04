@@ -13,7 +13,7 @@ import {
   sendCloudAlertTest,
   syncCloudAlerts
 } from "./server/cloud-alerts.js";
-import { attachAccountSession, createAccountRouter, getWishlist } from "./server/account.js";
+import { attachAccountSession, createAccountRouter, getWishlist, getPlayerSummaries } from "./server/account.js";
 import { createPushRouter, sendUserPush } from "./server/push.js";
 import { getInternalHistory, getPurchaseAdvice, recordPriceSnapshot, runTrackedHistorySweep } from "./server/history-store.js";
 import { createReliabilityRouter, distributedCacheGet, distributedCacheSet, finishCronRun, rateLimit, startCronRun, updateServiceHealth } from "./server/reliability.js";
@@ -1070,6 +1070,8 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
     for (const [appId, count] of counts.entries()) {
       if (count >= 2) {
         const meta = metaMap.get(appId) || {};
+        const tags = meta.tags || [];
+        const isCoop = tags.some(t => ["Co-op", "Multiplayer", "Online Co-Op", "Local Co-Op"].includes(String(t)));
         matches.push({
           appId,
           matchCount: count,
@@ -1079,12 +1081,22 @@ app.get('/api/wishlist/compare', async (req, res, next) => {
           discountPercent: meta.discount_pct || 0,
           priceAmount: meta.subs?.[0]?.price || null,
           isFree: Boolean(meta.is_free_game),
-          type: meta.type || "game"
+          type: meta.type || "game",
+          tags: tags,
+          isCoop: isCoop
         });
       }
     }
-    matches.sort((a, b) => b.matchCount - a.matchCount || b.discountPercent - a.discountPercent);
-    res.json({ success: true, matchedCount: matches.length, totalAnalyzed: wishlists.length, matches, errors });
+    
+    // Sort matches: Co-op first, then highest matches, then highest discount
+    matches.sort((a, b) => {
+      if (a.isCoop !== b.isCoop) return a.isCoop ? -1 : 1;
+      if (a.matchCount !== b.matchCount) return b.matchCount - a.matchCount;
+      return b.discountPercent - a.discountPercent;
+    });
+
+    const players = await getPlayerSummaries(wishlists.map(w => w.steamId));
+    res.json({ success: true, matchedCount: matches.length, totalAnalyzed: wishlists.length, matches, errors, players });
   } catch (error) { next(error); }
 });
 

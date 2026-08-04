@@ -2936,29 +2936,61 @@ function initBudgetComboModal() {
       return b.avgDiscount - a.avgDiscount;
     });
 
+    let maxDiscount = 0;
+    uniqueCombos.forEach(c => { if (c.avgDiscount > maxDiscount) maxDiscount = c.avgDiscount; });
+
     const topCombos = uniqueCombos.slice(0, 5);
 
     if (!topCombos.length) {
-      results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo 2-3 game khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
+      results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
       return;
     }
 
-    results.innerHTML = topCombos.map((combo, idx) => `
-      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <strong style="color:var(--primary); font-size:14px;">🔥 Combo #${idx + 1} (${combo.items.length} Game)</strong>
-          <span style="font-weight:700; color:var(--success); font-size:15px;">Tổng: ${combo.totalPrice.toLocaleString("vi-VN")}đ</span>
+    results.innerHTML = topCombos.map((combo, idx) => {
+      const pct = Math.min(100, Math.round((combo.totalPrice / budget) * 100));
+      let badges = [];
+      if (idx === 0) badges.push(`<span style="font-size:10px; background:var(--primary); color:#fff; padding:2px 6px; border-radius:10px;">🏆 Khít Nhất</span>`);
+      if (combo.avgDiscount === maxDiscount && maxDiscount >= 50) badges.push(`<span style="font-size:10px; background:var(--error); color:#fff; padding:2px 6px; border-radius:10px;">🔥 Siêu Rẻ</span>`);
+      if (combo.items.length >= 4) badges.push(`<span style="font-size:10px; background:var(--success); color:#fff; padding:2px 6px; border-radius:10px;">📦 Đa Dạng</span>`);
+      
+      const copyText = combo.items.map(i => `- ${i.name} (${(i._calcPrice||0).toLocaleString('vi-VN')}đ)`).join('\\n') + `\\nTổng: ${combo.totalPrice.toLocaleString('vi-VN')}đ`;
+
+      return `
+      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <strong style="color:var(--primary); font-size:14px;">Combo #${idx + 1} (${combo.items.length} Game)</strong>
+            ${badges.join('')}
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-weight:700; color:var(--success); font-size:15px;">${combo.totalPrice.toLocaleString("vi-VN")}đ</span>
+            <button onclick="navigator.clipboard.writeText('${copyText}').then(()=>alert('Đã copy danh sách Combo!'))" style="background:var(--surface-hover); border:none; border-radius:4px; padding:4px 8px; cursor:pointer; color:var(--text-secondary); font-size:12px;" title="Copy danh sách">📋</button>
+          </div>
         </div>
+        
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:4px;">
+            <span>Đã dùng: ${pct}%</span>
+            <span>Ngân sách: ${budget.toLocaleString("vi-VN")}đ</span>
+          </div>
+          <div style="width:100%; height:6px; background:var(--surface-hover); border-radius:4px; overflow:hidden;">
+            <div style="height:100%; width:${pct}%; background:var(--primary); border-radius:4px;"></div>
+          </div>
+        </div>
+
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
           ${combo.items.map(item => `
-            <div style="display:flex; gap:8px; align-items:center; background:var(--surface-elevated); padding:6px; border-radius:6px;">
+            <a href="https://store.steampowered.com/app/${item.id || item.appId}" target="_blank" style="text-decoration:none; display:flex; gap:8px; align-items:center; background:var(--surface-elevated); padding:6px; border-radius:6px; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
               <img src="${item.header_image || item.image || item.headerImage || `https://cdn.akamai.steamstatic.com/steam/apps/${item.id || item.appId}/header.jpg`}" style="width:60px; height:28px; object-fit:cover; border-radius:4px;">
-              <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${item.name}</div>
-            </div>
+              <div style="display:flex; flex-direction:column;">
+                <div style="font-size:12px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${item.name}</div>
+                <div style="font-size:10px; color:var(--success); font-weight:700;">${item._calcPrice ? item._calcPrice.toLocaleString("vi-VN") + 'đ' : 'Miễn phí'}</div>
+              </div>
+            </a>
           `).join("")}
         </div>
       </div>
-    `).join("");
+    `}).join("");
   });
 }
 
@@ -3008,17 +3040,35 @@ function initCoopWishlistModal() {
       }
 
       results.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; background:var(--bg-primary); padding:10px; border-radius:8px;">
+          <span style="font-size:12px; color:var(--text-muted);">Tổ đội:</span>
+          ${data.players && data.players.length ? data.players.map(p => `
+            <div style="display:flex; align-items:center; gap:6px; background:var(--surface-elevated); padding:4px 8px; border-radius:20px;">
+              <img src="${p.avatar}" style="width:20px; height:20px; border-radius:50%;">
+              <span style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.personaname}</span>
+            </div>
+          `).join("") : '<span style="font-size:12px; color:var(--text-muted);">${data.totalAnalyzed} thành viên</span>'}
+        </div>
         <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">Tìm thấy <strong>${data.matchedCount}</strong> game xuất hiện chung trong Wishlist:</div>
         ${data.matches.map(m => `
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px;">
             <div style="display:flex; align-items:center; gap:12px;">
               <img src="${m.banner}" style="width:90px; height:42px; object-fit:cover; border-radius:4px;">
               <div>
-                <div style="font-weight:600; font-size:14px; color:var(--text-primary);">${m.name}</div>
-                <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 6px; border-radius:10px;">Trùng ${m.matchCount}/${m.totalUsers} người</span>
+                <div style="font-weight:600; font-size:14px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                  ${m.name}
+                  ${m.isCoop ? `<span style="font-size:10px; background:var(--success); color:#fff; padding:2px 4px; border-radius:4px; line-height:1;">🔥 Co-op</span>` : ''}
+                </div>
+                <div style="margin-top:4px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                  <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 6px; border-radius:10px;">Trùng ${m.matchCount}/${m.totalUsers} người</span>
+                  ${m.priceAmount ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">~ ${(m.priceAmount / 100).toLocaleString('vi-VN')}đ/người</span>` : (m.isFree ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">Miễn phí</span>` : '')}
+                </div>
               </div>
             </div>
-            ${m.discountPercent > 0 ? `<div style="font-weight:700; color:var(--success); font-size:14px;">-${m.discountPercent}%</div>` : ''}
+            <div style="text-align:right;">
+              ${m.discountPercent > 0 ? `<div style="font-weight:700; color:var(--success); font-size:14px;">-${m.discountPercent}%</div>` : ''}
+              ${m.priceAmount ? `<div style="font-size:11px; color:var(--text-primary); font-weight:600; margin-top:4px;">Tổng bill: ${(m.priceAmount * m.matchCount / 100).toLocaleString('vi-VN')}đ</div>` : ''}
+            </div>
           </div>
         `).join("")}
       `;

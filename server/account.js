@@ -151,6 +151,18 @@ export async function getWishlist(steamId) {
   return all;
 }
 
+export async function getPlayerSummaries(steamIds) {
+  const apiKey = config().steamApiKey;
+  if (!apiKey || !steamIds || !steamIds.length) return [];
+  try {
+    const res = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamIds.join(",")}`);
+    const data = await res.json();
+    return data?.response?.players || [];
+  } catch (e) {
+    return [];
+  }
+}
+
 function normalizeTracker(games) {
   const unique = new Map();
   for (const raw of Array.isArray(games) ? games.slice(0, 500) : []) {
