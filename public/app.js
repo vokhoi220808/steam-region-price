@@ -107,7 +107,11 @@ const I18N = {
     history_range_6m: "6 Tháng",
     history_range_3m: "3 Tháng",
     history_loading_real: "Đang tải dữ liệu thật từ máy chủ...",
-    history_note_real: "* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại."
+    history_note_real: "* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại.",
+    steam_login: "Đăng nhập Steam",
+    steam_logout: "Đăng xuất",
+    err_invalid_appid: "App ID không tồn tại trên Steam Store.",
+    toast_refreshed: "Đã làm mới giá game thành công."
   },
   en: {
     hero_title: "Search & compare Steam prices across 14 countries",
@@ -194,7 +198,11 @@ const I18N = {
     history_range_6m: "6 Months",
     history_range_3m: "3 Months",
     history_loading_real: "Loading real data from server...",
-    history_note_real: "* Original USD data (from ITAD) converted to current exchange rates."
+    history_note_real: "* Original USD data (from ITAD) converted to current exchange rates.",
+    steam_login: "Sign in with Steam",
+    steam_logout: "Sign out",
+    err_invalid_appid: "App ID does not exist on Steam Store.",
+    toast_refreshed: "Successfully refreshed game prices."
   }
 };
 
@@ -341,6 +349,22 @@ function formatCurrency(val, code) {
     maximumFractionDigits: noDecimals ? 0 : 2
   }).format(val).replace(/\s/g, " "); // Ensure space between number and symbol
 }
+
+function showToast(message, type = 'success') {
+  let root = document.getElementById('accountToastRoot');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'accountToastRoot';
+    root.className = 'account-toast-root';
+    document.body.append(root);
+  }
+  const item = document.createElement('div');
+  item.className = `account-toast ${type}`;
+  item.textContent = message;
+  root.append(item);
+  setTimeout(() => item.remove(), 3500);
+}
+window.showToast = showToast;
 
 function setInlineFieldError(input, message) {
   if (!input) return;
@@ -499,8 +523,7 @@ async function init() {
     document.getElementById("searchInput").value = appIdParam;
     fetchRealData(appIdParam);
   } else {
-    document.getElementById("searchInput").value = "1245620";
-    setTimeout(() => fetchRealData("1245620"), 100);
+    document.getElementById("searchInput").value = "";
   }
   
   document.querySelectorAll(".switch-btn").forEach(btn => {
@@ -705,21 +728,49 @@ function setupCurrencyDropdown() {
 }
 
 function changeCurrency(code) {
+  if (!code) return;
   state.currency = code;
   localStorage.setItem("steam_target_currency", code);
   
-  const c = CURRENCIES.find(x => x.code === code);
+  const c = CURRENCIES.find(x => x.code === code) || { code, name: code, en_name: code, flagCode: "us" };
   const cName = state.lang === "vi" ? c.name : c.en_name;
-  document.getElementById("currencyTriggerContent").innerHTML = `<span class="flag">${getFlagHtml(c.flagCode)}</span> <span class="code">${c.code}</span> <span class="name">${cName}</span>`;
-  document.getElementById("hintCurrencyCode").textContent = c.code;
-  document.getElementById("summaryCurrCode").textContent = c.code;
-  document.getElementById("toolbarCurrDisplay").textContent = c.code;
-  document.getElementById("thCurrLabel").textContent = c.code;
-  document.getElementById("chartLabel").textContent = c.code;
+
+  const matchingRegion = REGIONS_DATA.find(r => r.curr === code);
+  if (matchingRegion) {
+    state.region = matchingRegion.code.toUpperCase();
+    localStorage.setItem("steam_region", state.region);
+    const globalRegionSelect = document.getElementById("globalRegionSelect");
+    if (globalRegionSelect) globalRegionSelect.value = state.region;
+  }
+
+  const triggerContent = document.getElementById("currencyTriggerContent");
+  if (triggerContent) {
+    triggerContent.innerHTML = `<span class="flag">${getFlagHtml(c.flagCode)}</span> <span class="code">${c.code}</span> <span class="name">${cName}</span>`;
+  }
+
+  const hintEl = document.getElementById("hintCurrencyCode");
+  if (hintEl) hintEl.textContent = c.code;
+  const summaryEl = document.getElementById("summaryCurrCode");
+  if (summaryEl) summaryEl.textContent = c.code;
+  const toolbarEl = document.getElementById("toolbarCurrDisplay");
+  if (toolbarEl) toolbarEl.textContent = c.code;
+  const thEl = document.getElementById("thCurrLabel");
+  if (thEl) thEl.textContent = c.code;
+  const chartEl = document.getElementById("chartLabel");
+  if (chartEl) chartEl.textContent = c.code;
   
   if (state.currentData) {
     processData();
     renderData();
+  }
+
+  const dealsView = document.getElementById("dealsView");
+  if (dealsView && !dealsView.classList.contains("hidden") && typeof renderDeals === "function") {
+    renderDeals();
+  }
+
+  if (window.TrackerView && typeof window.TrackerView.renderWatchlist === "function") {
+    window.TrackerView.renderWatchlist();
   }
 }
 
@@ -2656,13 +2707,11 @@ document.addEventListener("DOMContentLoaded", init);
 // Called from Compare/Deals views when user clicks "Add to Radar"
 function toggleTrackGame(appId, name, image) {
   if (!state.currentData?.steamVerified || Number(state.currentData.appId) !== Number(appId)) {
-    showFeedback("Game chưa được Steam xác thực nên không thể đưa vào Radar.", "error");
+    showToast(t("err_invalid_appid") || "App ID không tồn tại trên Steam Store.", "error");
     return;
   }
-  // Use new StorageRepository if available
   const repo = window._trackerRepo;
   if (!repo) {
-    // Fallback: just navigate to tracker tab
     switchView('tracker');
     return;
   }
@@ -2670,6 +2719,7 @@ function toggleTrackGame(appId, name, image) {
   const existing = repo.getByAppId(appId);
   if (existing) {
     repo.remove(existing.id);
+    showToast(`Đã xoá ${name} khỏi Radar.`, "info");
   } else {
     repo.create({
       appId: parseInt(appId),
@@ -2677,9 +2727,9 @@ function toggleTrackGame(appId, name, image) {
       headerImage: image,
       steamUrl: 'https://store.steampowered.com/app/' + appId,
     });
+    showToast(`Đã thêm ${name} vào Radar!`, "success");
   }
 
-  // Trigger tracker re-render
   window.dispatchEvent(new CustomEvent('tracker:games-change'));
   updateTrackBtnUI(appId);
 }

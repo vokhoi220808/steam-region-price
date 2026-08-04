@@ -71,7 +71,7 @@ const REGIONS = [
 const cache = new Map();
 const cacheStats = { hits: 0, misses: 0, evictions: 0 };
 const CACHE_MAX_ENTRIES = 1200;
-const PRICE_TTL = 20 * 60 * 1000;
+const PRICE_TTL = 2 * 60 * 60 * 1000;
 const FX_TTL = 6 * 60 * 60 * 1000;
 const DEALS_TTL = 5 * 60 * 1000;
 const METADATA_TTL = 6 * 60 * 60 * 1000;
@@ -836,16 +836,37 @@ async function resolveSteamId(profileInput) {
 }
 
 app.get('/api/wishlist', async (req, res) => {
-  if (!STEAM_API_KEY) {
-    return res.status(503).json({ error: "STEAM_API_KEY chưa được cấu hình trên máy chủ." });
-  }
   try {
     const steamId = await resolveSteamId(req.query.profile);
     if (!steamId) return res.status(400).json({ error: "Steam ID hoặc Profile Link không hợp lệ." });
-    const params = new URLSearchParams({ key: STEAM_API_KEY, steamid: steamId });
-    const wishlist = await fetchJson(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?${params.toString()}`);
-    const rawItems = wishlist?.response?.items || wishlist?.response?.apps || [];
-    const ids = [...new Set(rawItems.map((item) => Number(item.appid || item.app_id || item)).filter(Number.isInteger))];
+    
+    let ids = [];
+    if (STEAM_API_KEY) {
+      try {
+        const params = new URLSearchParams({ key: STEAM_API_KEY, steamid: steamId });
+        const wishlist = await fetchJson(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?${params.toString()}`);
+        const rawItems = wishlist?.response?.items || wishlist?.response?.apps || [];
+        ids = [...new Set(rawItems.map((item) => Number(item.appid || item.app_id || item)).filter(Number.isInteger))];
+      } catch (err) {
+        console.warn("IWishlistService failed, falling back to public store wishlist:", err.message);
+      }
+    }
+
+    if (!ids.length) {
+      try {
+        const publicWishlist = await fetchJson(`https://store.steampowered.com/wishlist/profiles/${steamId}/wishlistdata/?p=0`);
+        if (publicWishlist && typeof publicWishlist === 'object') {
+          ids = Object.keys(publicWishlist).map(Number).filter(Number.isInteger);
+        }
+      } catch (e) {
+        console.warn("Public wishlist fetch error:", e.message);
+      }
+    }
+
+    if (!ids.length && !STEAM_API_KEY) {
+      return res.status(503).json({ error: "Không thể lấy Steam Wishlist. Vui lòng đảm bảo hồ sơ Steam để chế độ Công khai (Public)." });
+    }
+
     const selected = ids.slice(0, 200);
     const games = await mapWithConcurrency(selected, 5, async (appId) => {
       const cacheKey = `wishlist-app:${appId}`;
@@ -871,7 +892,7 @@ app.get('/api/wishlist', async (req, res) => {
     res.json({ steamId, total: ids.length, limited: ids.length > selected.length, games });
   } catch (error) {
     console.error("Steam Wishlist Error:", error.message);
-    res.status(502).json({ error: "Không thể đồng bộ wishlist. Hãy kiểm tra quyền riêng tư và Steam API key." });
+    res.status(502).json({ error: "Không thể đồng bộ wishlist. Hãy kiểm tra quyền riêng tư hồ sơ Steam." });
   }
 });
 

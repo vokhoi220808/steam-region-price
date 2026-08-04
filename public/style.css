@@ -1775,17 +1775,18 @@ body::before {
 .header-mini-search > span { padding-left: 12px; color: var(--primary); font-size: 20px; }
 .header-mini-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; padding: 0 10px; font-size: 12px; }
 .header-mini-search button { height: 30px; margin-right: 4px; padding: 0 11px; border: 0; border-radius: 8px; background: var(--primary); color: #061116; font-weight: 800; cursor: pointer; }
-.app-header.is-scrolled .header-nav { display: none; }
-.app-header.is-scrolled .header-mini-search { width: min(31vw, 360px); opacity: 1; pointer-events: auto; }
+.app-header.is-scrolled .header-nav { display: flex; }
+.app-header.is-scrolled .header-mini-search { width: min(24vw, 260px); opacity: 1; pointer-events: auto; }
 
-.main-content { padding-top: 0; }
+.main-content { padding-top: var(--header-height, 70px); }
+.setup-section, .content-section, #resultsArea, .card, #dealsView, #trackerView { scroll-margin-top: calc(var(--header-height, 70px) + 16px); }
 .hero-section {
   position: relative;
-  min-height: 480px;
+  min-height: 420px;
   display: grid;
   place-items: center;
-  margin: -81px 0 34px;
-  padding: 150px 24px 74px;
+  margin: 0 0 34px;
+  padding: 60px 24px 74px;
   overflow: visible;
   border-bottom: 1px solid rgba(0,240,255,.08);
   background:
