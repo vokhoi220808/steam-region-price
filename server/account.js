@@ -113,11 +113,39 @@ export async function getWishlist(steamId) {
       headers: { Accept: "application/json", "User-Agent": "Steam-Regional-Price-Comparator/1.0" },
       signal: AbortSignal.timeout(15000)
     });
-    if (!response.ok) throw new Error(response.status === 403 ? "Wishlist Steam đang để riêng tư." : `Steam wishlist HTTP ${response.status}`);
-    const pageData = await response.json();
+    if (!response.ok) {
+      if (response.status === 403 || response.status === 404 || response.status === 302) {
+        throw new Error("Wishlist Steam đang để riêng tư hoặc không tồn tại.");
+      }
+      throw new Error(`Steam wishlist HTTP ${response.status}`);
+    }
+    
+    let pageData;
+    try {
+      pageData = await response.json();
+    } catch (err) {
+      break; // Not JSON (probably rate limited or Steam error page)
+    }
+
+    if (pageData && pageData.success === 2) {
+      throw new Error("Wishlist Steam đang để riêng tư (Steam trả về success: 2).");
+    }
+
     const entries = Object.entries(pageData || {});
     if (!entries.length) break;
-    all.push(...entries.map(([appId, item]) => ({ appId: Number(appId), priority: Number(item.priority || 0), addedAt: item.added ? new Date(item.added * 1000).toISOString() : null, metadata: item })));
+    
+    for (const [appIdStr, item] of entries) {
+      const appId = Number(appIdStr);
+      if (Number.isInteger(appId) && appId > 0) {
+        all.push({ 
+          appId, 
+          priority: Number(item.priority || 0), 
+          addedAt: item.added ? new Date(item.added * 1000).toISOString() : null, 
+          metadata: item 
+        });
+      }
+    }
+    
     if (entries.length < 100) break;
   }
   return all;

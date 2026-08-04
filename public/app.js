@@ -2989,7 +2989,18 @@ function initCoopWishlistModal() {
     try {
       const res = await fetch(`/api/wishlist/compare?steamIds=${encodeURIComponent(rawVal)}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Không thể so sánh Wishlist");
+      if (!res.ok) {
+        let errHtml = `<div style="color:var(--error); text-align:center; padding:12px;">${data.error || "Không thể so sánh Wishlist"}</div>`;
+        if (data.details && data.details.length) {
+          errHtml += `<div style="font-size:12px; color:var(--text-muted); text-align:left; margin-top:8px; background:var(--bg-primary); padding:10px; border-radius:4px;">`;
+          data.details.forEach(d => {
+            errHtml += `<div style="margin-bottom:4px;">• <strong style="color:var(--primary)">${d.steamId}</strong>: ${d.error}</div>`;
+          });
+          errHtml += `</div>`;
+        }
+        results.innerHTML = errHtml;
+        return;
+      }
 
       if (!data.matches || !data.matches.length) {
         results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy tựa game nào trùng nhau trong Wishlist công khai của các tài khoản này.</div>`;
