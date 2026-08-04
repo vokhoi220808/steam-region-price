@@ -55,7 +55,7 @@ export default class AlertSettings {
 
   get targetGames() {
     return trackerStore.getAllGames()
-      .filter((game) => game.appId && game.targetPrice && Number.isFinite(Number(game.targetPrice.amount)))
+      .filter((game) => game.alertEnabled !== false && game.appId && game.targetPrice && Number.isFinite(Number(game.targetPrice.amount)))
       .map((game) => ({
         appId: Number(game.appId),
         productType: /\/sub\//i.test(game.steamUrl || '') ? 'sub' : 'app',

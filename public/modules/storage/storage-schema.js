@@ -63,6 +63,7 @@ export function createGame(partial = {}) {
     collectionIds: [],
     note: '',
     pinned: false,
+    alertEnabled: true,
     duplicateOf: null,
     errorData: null,
     createdAt: now,
@@ -91,6 +92,7 @@ export function createGame(partial = {}) {
   game.regionalPrices = Array.isArray(game.regionalPrices) ? game.regionalPrices : [];
   game.note = String(game.note ?? game.notes ?? '');
   game.pinned = Boolean(game.pinned ?? game.isPinned);
+  game.alertEnabled = game.alertEnabled !== false;
   game.duplicateOf = game.duplicateOf ? String(game.duplicateOf) : null;
   game.createdAt = game.createdAt || now;
   game.updatedAt = game.updatedAt || now;

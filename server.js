@@ -394,7 +394,11 @@ async function getDealMetadata(appId) {
       tags: details?.genres?.map((genre) => genre.description) || [],
       reviewScore: reviews?.review_score || 0,
       reviewScoreDesc: reviews?.review_score_desc || null,
-      totalReviews: reviews?.total_reviews || 0
+      totalReviews: reviews?.total_reviews || 0,
+      totalPositive: reviews?.total_positive || 0,
+      reviewPercent: reviews?.total_reviews
+        ? Math.round((Number(reviews.total_positive || 0) / Number(reviews.total_reviews)) * 100)
+        : null
     };
     setCache(stableKey, stable, METADATA_TTL);
   }
@@ -474,6 +478,9 @@ app.get("/api/compare-stream/:appId", async (req, res) => {
   try {
     const prices = [];
     const ratesPromise = getExchangeRates(targetCurrency);
+    const communityMetadataPromise = productType === "app"
+      ? getDealMetadata(appId).catch(() => null)
+      : Promise.resolve(null);
     await mapWithConcurrency(selectedRegions, 4, async (region) => {
       const [rawPrice, rates] = await Promise.all([
         productType === "sub"
@@ -506,7 +513,7 @@ app.get("/api/compare-stream/:appId", async (req, res) => {
     const packageMetadata = packageSeed
       ? await getPackageMetadata(appId, packageSeed.includedApps, language)
       : null;
-    const rates = await ratesPromise;
+    const [rates, communityMetadata] = await Promise.all([ratesPromise, communityMetadataPromise]);
     writeEvent({
       type: "complete",
       data: {
@@ -520,6 +527,10 @@ app.get("/api/compare-stream/:appId", async (req, res) => {
         genres: packageMetadata?.genres || firstValue("genres"),
         shortDescription: firstValue("shortDescription") || packageMetadata?.shortDescription || null,
         includedApps: firstValue("includedApps") || [],
+        reviewScoreDesc: communityMetadata?.reviewScoreDesc || null,
+        reviewPercent: communityMetadata?.reviewPercent ?? null,
+        totalReviews: communityMetadata?.totalReviews || 0,
+        ccu: communityMetadata?.ccu || 0,
         fxAvailable: Boolean(rates),
         checkedAt: new Date().toISOString()
       }

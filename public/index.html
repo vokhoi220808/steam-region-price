@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
   <link rel="stylesheet" href="tracker.css?v=24" />
 </head>
 <body>
@@ -28,8 +28,8 @@
         <a href="/" class="brand">
           <img src="/logo.jpg" alt="Logo" class="brand-logo" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover; margin-right: 12px;" />
           <div class="brand-text">
-            <h1>Steam Price Compare</h1>
-            <span class="badge">Regional Prices</span>
+            <h1>Steam Region Price</h1>
+            <span class="badge">LIVE MARKET</span>
           </div>
         </a>
       </div>
@@ -39,6 +39,12 @@
         <a href="#" id="navDealsBtn" data-i18n="nav_deals">Top Deals</a>
         <a href="#" id="navTrackerBtn" data-i18n="nav_track">Theo dõi giá</a>
       </nav>
+
+      <form class="header-mini-search" id="headerMiniSearch" role="search">
+        <span aria-hidden="true">⌕</span>
+        <input id="headerMiniSearchInput" type="search" placeholder="Tìm game hoặc App ID" aria-label="Tìm game nhanh" autocomplete="off" />
+        <button type="submit">So sánh</button>
+      </form>
       
       <div class="header-actions">
         <button class="steam-account-btn" id="steamAccountBtn" type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid rgba(102, 192, 244, 0.4); border-radius: 6px; background: linear-gradient(135deg, rgba(27, 103, 145, 0.4) 0%, rgba(19, 45, 76, 0.8) 100%); color: #66c0f4; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;">
@@ -77,8 +83,9 @@
     <!-- 5. Hero & Search -->
     <section class="hero-section">
       <div class="hero-inner">
-        <h2 class="hero-title" data-i18n="hero_title">So sánh giá Steam trên toàn thế giới</h2>
-        <p class="hero-desc" data-i18n="hero_desc">Kiểm tra giá game tại nhiều khu vực, quy đổi sang cùng một loại tiền tệ và tìm mức giá tốt nhất chỉ trong vài giây.</p>
+        <div class="hero-eyebrow"><span></span> STEAM PRICE INTELLIGENCE</div>
+        <h2 class="hero-title" data-i18n="hero_title">Tìm kiếm &amp; so sánh giá Steam tại 14 quốc gia</h2>
+        <p class="hero-desc" data-i18n="hero_desc">Một lần tìm kiếm. Mọi khu vực. Biết ngay đâu là mức giá đáng mua nhất.</p>
         
         <div class="search-container">
           <form id="searchForm" class="search-form">
@@ -108,6 +115,11 @@
             <button class="chip-btn" data-appid="271590">GTA V</button>
             <button class="chip-btn" data-appid="1174180">Red Dead Redemption 2</button>
           </div>
+        </div>
+        <div class="hero-trust-row" aria-label="Thông tin dịch vụ">
+          <span><strong>14+</strong> khu vực</span>
+          <span><strong>Live</strong> Steam Store</span>
+          <span><strong>1-click</strong> quy đổi</span>
         </div>
       </div>
     </section>
@@ -282,6 +294,10 @@
             </div>
             <div class="game-details">
               <h2 id="gameTitleName">Tên Game</h2>
+              <div class="spotlight-badges" aria-live="polite">
+                <span class="spotlight-badge review" id="gameReviewBadge">Đang tải đánh giá…</span>
+                <span class="spotlight-badge price-intel" id="gamePriceIntelBadge">Đang phân tích lịch sử giá…</span>
+              </div>
               <div class="game-meta">
                 <span class="meta-row"><span data-i18n="dev">Nhà phát triển:</span> <strong id="gameDeveloper">...</strong></span>
                 <span class="meta-row"><span data-i18n="publisher">Nhà xuất bản:</span> <strong id="gamePublisher">...</strong></span>
@@ -447,6 +463,16 @@
             <!-- Bars injected by JS -->
           </div>
         </div>
+
+        <section class="history-discovery-card" aria-labelledby="historyDiscoveryTitle">
+          <div class="history-discovery-copy">
+            <span class="history-kicker">PRICE TREND</span>
+            <h3 id="historyDiscoveryTitle">Giá hiện tại có thật sự tốt?</h3>
+            <p>Xem biến động 30 ngày, 6 tháng hoặc 1 năm và đối chiếu với mốc thấp nhất lịch sử.</p>
+          </div>
+          <div class="history-sparkline" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <button type="button" class="btn btn-secondary" id="openHistoryDiscoveryBtn">Mở biểu đồ lịch sử</button>
+        </section>
 
       </div>
     </section>
@@ -850,10 +876,22 @@
     </div>
   </div>
 
+  <div class="watchlist-drawer-overlay" id="watchlistDrawerOverlay"></div>
+  <aside class="watchlist-drawer" id="watchlistDrawer" aria-hidden="true" aria-labelledby="watchlistDrawerTitle">
+    <div class="watchlist-drawer-header">
+      <div><span>WATCHLIST</span><h2 id="watchlistDrawerTitle">Radar săn giá</h2></div>
+      <button type="button" class="watchlist-close" id="watchlistDrawerClose" aria-label="Đóng danh sách theo dõi">×</button>
+    </div>
+    <div class="watchlist-drawer-body" id="watchlistDrawerBody"></div>
+    <div class="watchlist-drawer-footer">
+      <button type="button" class="btn btn-primary btn-block" id="openFullTrackerBtn">Mở toàn bộ Tracker</button>
+    </div>
+  </aside>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="modules/tracker/tracker-page.js?v=22"></script>
   <script type="module" src="modules/account/account-manager.js?v=3"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
   <!-- Footer -->
 <style>
 .site-footer{

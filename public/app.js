@@ -23,8 +23,8 @@ const state = {
 
 const I18N = {
   vi: {
-    hero_title: "So sánh giá Steam trên toàn thế giới",
-    hero_desc: "Kiểm tra giá game tại nhiều khu vực, quy đổi sang cùng một loại tiền tệ và tìm mức giá tốt nhất chỉ trong vài giây.",
+    hero_title: "Tìm kiếm & so sánh giá Steam tại 14 quốc gia",
+    hero_desc: "Một lần tìm kiếm. Mọi khu vực. Biết ngay đâu là mức giá đáng mua nhất.",
     search_placeholder: "Tìm game hoặc dán đường dẫn Steam...",
     search_btn: "So sánh giá",
     region_title: "Khu vực cần so sánh",
@@ -110,8 +110,8 @@ const I18N = {
     history_note_real: "* Dữ liệu gốc bằng USD (từ ITAD) đã được quy đổi sang tỉ giá hiện tại."
   },
   en: {
-    hero_title: "Compare Steam Prices Worldwide",
-    hero_desc: "Check game prices across regions, convert to a single currency, and find the best deals in seconds.",
+    hero_title: "Search & compare Steam prices across 14 countries",
+    hero_desc: "One search. Every region. Instantly see where the price is worth buying.",
     search_placeholder: "Search game or paste Steam URL...",
     search_btn: "Compare",
     region_title: "Regions to Compare",
@@ -1326,6 +1326,69 @@ function setupDealsEvents() {
   });
 }
 
+function escapeMarkup(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderWatchlistDrawer() {
+  const body = document.getElementById("watchlistDrawerBody");
+  if (!body) return;
+  const games = window._trackerRepo?.getAll?.() || [];
+  if (!games.length) {
+    body.innerHTML = `
+      <div class="watchlist-empty">
+        <span>◎</span>
+        <h3>Radar đang trống</h3>
+        <p>Thêm game từ kết quả so sánh để theo dõi giá và nhận cảnh báo.</p>
+      </div>`;
+    return;
+  }
+  body.innerHTML = games.slice(0, 8).map((game) => {
+    const latest = game.latestPrice;
+    const hasAlert = Boolean(game.targetPrice);
+    return `
+      <article class="watchlist-quick-card">
+        <img src="${escapeMarkup(game.headerImage || `https://cdn.akamai.steamstatic.com/steam/apps/${game.appId}/header.jpg`)}" alt="" loading="lazy">
+        <div class="watchlist-quick-info">
+          <strong>${escapeMarkup(game.customName || game.name)}</strong>
+          <span>${latest ? formatCurrency(latest.amount, latest.currency) : "Chưa có giá mới"}</span>
+        </div>
+        <label class="watchlist-alert-toggle" title="${hasAlert ? "Bật hoặc tạm dừng cảnh báo giá" : "Mở Tracker để đặt giá mục tiêu"}">
+          <input type="checkbox" data-watch-alert="${escapeMarkup(game.id)}" ${hasAlert && game.alertEnabled !== false ? "checked" : ""} ${hasAlert ? "" : "disabled"} aria-label="${hasAlert ? "Bật cảnh báo giá" : "Chưa đặt giá mục tiêu"}">
+          <i></i>
+        </label>
+      </article>`;
+  }).join("");
+  if (games.length > 8) body.insertAdjacentHTML("beforeend", `<p class="watchlist-more">+${games.length - 8} game khác trong Tracker</p>`);
+  body.querySelectorAll("[data-watch-alert]").forEach((input) => {
+    input.addEventListener("change", () => {
+      window._trackerRepo?.update?.(input.dataset.watchAlert, { alertEnabled: input.checked });
+      window.dispatchEvent(new CustomEvent("tracker:games-change"));
+      showFeedback(input.checked ? "Đã bật cảnh báo giá cho game." : "Đã tạm dừng cảnh báo giá.");
+    });
+  });
+}
+
+function openWatchlistDrawer() {
+  renderWatchlistDrawer();
+  document.getElementById("watchlistDrawer")?.classList.add("open");
+  document.getElementById("watchlistDrawerOverlay")?.classList.add("open");
+  document.getElementById("watchlistDrawer")?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("drawer-open");
+}
+
+function closeWatchlistDrawer() {
+  document.getElementById("watchlistDrawer")?.classList.remove("open");
+  document.getElementById("watchlistDrawerOverlay")?.classList.remove("open");
+  document.getElementById("watchlistDrawer")?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("drawer-open");
+}
+
 function switchView(viewName) {
   const heroSection = document.querySelector(".hero-section");
   const compareSetup = document.querySelector(".container:not(.hidden):not(#dealsView):not(.legal-warning)"); // The region selection container
@@ -1423,7 +1486,43 @@ function setupEvents() {
   
   if (navCompare) navCompare.addEventListener("click", (e) => { e.preventDefault(); switchView("compare"); });
   if (navDeals) navDeals.addEventListener("click", (e) => { e.preventDefault(); switchView("deals"); });
-  if (navTracker) navTracker.addEventListener("click", (e) => { e.preventDefault(); switchView("tracker"); });
+  if (navTracker) navTracker.addEventListener("click", (e) => { e.preventDefault(); openWatchlistDrawer(); });
+
+  const appHeader = document.getElementById("appHeader");
+  const miniSearchForm = document.getElementById("headerMiniSearch");
+  const miniSearchInput = document.getElementById("headerMiniSearchInput");
+  const syncHeaderState = () => appHeader?.classList.toggle("is-scrolled", window.scrollY > 180);
+  window.addEventListener("scroll", syncHeaderState, { passive: true });
+  syncHeaderState();
+  miniSearchForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const query = String(miniSearchInput?.value || "").trim();
+    if (!query) {
+      switchView("compare");
+      document.getElementById("searchInput")?.focus();
+      return;
+    }
+    switchView("compare");
+    const mainSearch = document.getElementById("searchInput");
+    if (mainSearch) mainSearch.value = query;
+    fetchRealData(query);
+  });
+
+  document.getElementById("watchlistDrawerClose")?.addEventListener("click", closeWatchlistDrawer);
+  document.getElementById("watchlistDrawerOverlay")?.addEventListener("click", closeWatchlistDrawer);
+  document.getElementById("openFullTrackerBtn")?.addEventListener("click", () => {
+    closeWatchlistDrawer();
+    switchView("tracker");
+  });
+  document.getElementById("openHistoryDiscoveryBtn")?.addEventListener("click", () => {
+    document.getElementById("viewHistoryBtn")?.click();
+  });
+  window.addEventListener("tracker:games-change", () => {
+    if (document.getElementById("watchlistDrawer")?.classList.contains("open")) renderWatchlistDrawer();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.getElementById("watchlistDrawer")?.classList.contains("open")) closeWatchlistDrawer();
+  });
   
   const searchRegionInput = document.getElementById("regionSearchInput");
   if (searchRegionInput) searchRegionInput.addEventListener("input", e => renderRegions(e.target.value));
@@ -1763,6 +1862,10 @@ function buildComparisonViewData(metadata, rawPrices, appId, productType) {
     release: metadata.releaseDate || firstValue("releaseDate") || t("unknown"),
     tags: genres ? genres.split(", ").slice(0, 4) : ["Game"],
     description: metadata.shortDescription || firstValue("shortDescription") || (state.lang === "vi" ? "Không có thông tin giới thiệu." : "No description available."),
+    reviewScoreDesc: metadata.reviewScoreDesc || null,
+    reviewPercent: Number.isFinite(metadata.reviewPercent) ? metadata.reviewPercent : null,
+    totalReviews: Number(metadata.totalReviews || 0),
+    ccu: Number(metadata.ccu || 0),
     prices: rawPrices.map(normalizeComparisonPrice),
     steamVerified: Boolean(gameName)
   };
@@ -1873,6 +1976,7 @@ async function fetchRealData(query, requestedType = null) {
     
     processData();
     renderData();
+    updateSpotlightIntelligence();
     loadingProgressText.textContent = t("loading_progress").replace("{count}", selectedRegions.size).replace("{total}", selectedRegions.size);
     loadingProgressBar.style.width = "100%";
     loadingState.classList.add("hidden");
@@ -1920,6 +2024,41 @@ function processData() {
       p.convertedValue = 0;
     }
   });
+}
+
+async function updateSpotlightIntelligence() {
+  if (!state.currentData) return;
+  const reviewBadge = document.getElementById("gameReviewBadge");
+  const priceBadge = document.getElementById("gamePriceIntelBadge");
+  if (reviewBadge) {
+    const score = state.currentData.reviewPercent;
+    const label = state.currentData.reviewScoreDesc;
+    reviewBadge.textContent = score !== null
+      ? `${score}% ${label || (state.lang === "vi" ? "đánh giá tích cực" : "positive reviews")}`
+      : (state.lang === "vi" ? "Chưa có đủ đánh giá" : "Not enough reviews");
+    reviewBadge.title = state.currentData.totalReviews
+      ? `${state.currentData.totalReviews.toLocaleString()} Steam reviews`
+      : "Steam community reviews";
+  }
+  if (!priceBadge || state.currentData.productType === "sub") return;
+  priceBadge.textContent = state.lang === "vi" ? "Đang phân tích lịch sử giá…" : "Analyzing price history…";
+  priceBadge.className = "spotlight-badge price-intel loading";
+  try {
+    const response = await fetch(`/api/purchase-advice/${state.currentData.appId}`);
+    const advice = await response.json();
+    if (!response.ok) throw new Error(advice.error || "Price history unavailable");
+    const labels = {
+      BUY_NOW: state.lang === "vi" ? "★ Giá chạm vùng nên mua" : "★ Buy-zone price",
+      GOOD_DEAL: state.lang === "vi" ? "✓ Mức giá tốt" : "✓ Good deal",
+      WAIT_FOR_SALE: state.lang === "vi" ? "◷ Nên đợi sale" : "◷ Wait for sale"
+    };
+    priceBadge.textContent = labels[advice.action] || advice.badge;
+    priceBadge.title = advice.reason || "";
+    priceBadge.className = `spotlight-badge price-intel ${String(advice.action || "").toLowerCase()}`;
+  } catch {
+    priceBadge.textContent = state.lang === "vi" ? "Lịch sử đang được thu thập" : "History is being collected";
+    priceBadge.className = "spotlight-badge price-intel pending";
+  }
 }
 
 function getFilteredSortedPrices() {
@@ -1993,6 +2132,14 @@ function renderData() {
   
   document.getElementById("gameTitleName").textContent = state.currentData.name;
   document.getElementById("gameCoverImg").src = state.currentData.image;
+  const spotlightCard = document.querySelector(".game-result-card");
+  if (spotlightCard && state.currentData.image) {
+    spotlightCard.style.setProperty("--game-backdrop", `url("${String(state.currentData.image).replaceAll('"', '%22')}")`);
+  }
+  const reviewBadge = document.getElementById("gameReviewBadge");
+  if (reviewBadge && state.currentData.reviewPercent !== null) {
+    reviewBadge.textContent = `${state.currentData.reviewPercent}% ${state.currentData.reviewScoreDesc || "Positive"}`;
+  }
   document.getElementById("gameDeveloper").textContent = state.currentData.developer;
   document.getElementById("gamePublisher").textContent = state.currentData.publisher;
   document.getElementById("gameRelease").textContent = state.currentData.release;

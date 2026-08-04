@@ -91,3 +91,26 @@ test("production readiness reports missing mandatory configuration without leaki
     }
   }
 });
+
+test("cyber glass UX exposes smart search, price intelligence and watchlist drawer", async () => {
+  const [html, styles, client, server, schema, alertSettings] = await Promise.all([
+    readFile(new URL("public/index.html", root), "utf8"),
+    readFile(new URL("public/style.css", root), "utf8"),
+    readFile(new URL("public/app.js", root), "utf8"),
+    readFile(new URL("server.js", root), "utf8"),
+    readFile(new URL("public/modules/storage/storage-schema.js", root), "utf8"),
+    readFile(new URL("public/modules/components/alert-settings.js", root), "utf8")
+  ]);
+  assert.match(html, /id="headerMiniSearch"/);
+  assert.match(html, /id="gameReviewBadge"/);
+  assert.match(html, /id="watchlistDrawer"/);
+  assert.match(html, /id="openHistoryDiscoveryBtn"/);
+  assert.match(styles, /CYBER GLASS 2026/);
+  assert.match(styles, /scroll-snap-type:\s*x mandatory/);
+  assert.match(styles, /cubic-bezier\(\.16,1,\.3,1\)/);
+  assert.match(client, /updateSpotlightIntelligence/);
+  assert.match(client, /renderWatchlistDrawer/);
+  assert.match(server, /reviewPercent/);
+  assert.match(schema, /alertEnabled:\s*true/);
+  assert.match(alertSettings, /game\.alertEnabled !== false/);
+});
