@@ -2758,7 +2758,11 @@ function initBudgetComboModal() {
 
   if (!modal || !openBtn) return;
 
-  openBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  openBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+    if (input && !input.value) input.value = "150000";
+    if (runBtn) runBtn.click();
+  });
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
 
@@ -2771,39 +2775,54 @@ function initBudgetComboModal() {
 
     results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite;">🔄 Đang quét live danh sách deal từ Steam API...</div></div>`;
 
-    let pool = [];
+    let rawPool = [];
     try {
-      if (!dealsData?.specials?.items?.length) {
-        const res = await fetch(`/api/deals?category=specials&cc=${state.region || 'vn'}`);
-        const d = await res.json();
-        pool = (d.items || []).filter(item => Number(item.final_price || item.finalPrice || 0) > 0);
-      } else {
-        pool = (dealsData.specials.items || []).filter(d => Number(d.final_price || d.finalPrice || 0) > 0);
+      if (dealsData) {
+        Object.values(dealsData).forEach(cat => {
+          if (cat?.items && Array.isArray(cat.items)) rawPool = rawPool.concat(cat.items);
+        });
+      }
+      if (!rawPool.length) {
+        const res = await fetch(`/api/deals?cc=${state.region || 'vn'}`);
+        const d = await res.json().catch(() => ({}));
+        Object.values(d).forEach(cat => {
+          if (cat?.items && Array.isArray(cat.items)) rawPool = rawPool.concat(cat.items);
+        });
       }
     } catch (e) {}
+
+    // Deduplicate pool
+    const seen = new Set();
+    const pool = rawPool.filter(item => {
+      const id = item.id || item.appId;
+      const price = Number(item.final_price || item.finalPrice || (item.price && item.price.final) || 0);
+      if (!id || seen.has(id) || price <= 0) return false;
+      seen.add(id);
+      return true;
+    });
 
     if (!pool.length) {
       results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Không thể tải dữ liệu deal từ Steam. Vui lòng kiểm tra lại kết nối.</div>`;
       return;
     }
 
-    // Run Knapsack subset-sum algorithm for combos of 2 to 4 games
+    // Run Knapsack subset-sum algorithm for combos of 2 to 3 games
     const combos = [];
-    const n = Math.min(pool.length, 50);
+    const n = Math.min(pool.length, 60);
     const subPool = pool.slice(0, n);
 
     for (let i = 0; i < subPool.length; i++) {
       for (let j = i + 1; j < subPool.length; j++) {
-        const p1 = Number(subPool[i].final_price || subPool[i].finalPrice || 0);
-        const p2 = Number(subPool[j].final_price || subPool[j].finalPrice || 0);
+        const p1 = Number(subPool[i].final_price || subPool[i].finalPrice || (subPool[i].price && subPool[i].price.final) || 0);
+        const p2 = Number(subPool[j].final_price || subPool[j].finalPrice || (subPool[j].price && subPool[j].price.final) || 0);
         const total2 = p1 + p2;
-        if (total2 <= budget && total2 >= budget * 0.7) {
+        if (total2 <= budget && total2 >= budget * 0.6) {
           combos.push({ items: [subPool[i], subPool[j]], totalPrice: total2 });
         }
         for (let k = j + 1; k < subPool.length; k++) {
-          const p3 = Number(subPool[k].final_price || subPool[k].finalPrice || 0);
+          const p3 = Number(subPool[k].final_price || subPool[k].finalPrice || (subPool[k].price && subPool[k].price.final) || 0);
           const total3 = total2 + p3;
-          if (total3 <= budget && total3 >= budget * 0.75) {
+          if (total3 <= budget && total3 >= budget * 0.7) {
             combos.push({ items: [subPool[i], subPool[j], subPool[k]], totalPrice: total3 });
           }
         }
@@ -2811,7 +2830,7 @@ function initBudgetComboModal() {
     }
 
     combos.sort((a, b) => b.totalPrice - a.totalPrice);
-    const topCombos = combos.slice(0, 3);
+    const topCombos = combos.slice(0, 5);
 
     if (!topCombos.length) {
       results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo 2-3 game khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
@@ -2827,7 +2846,7 @@ function initBudgetComboModal() {
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
           ${combo.items.map(item => `
             <div style="display:flex; gap:8px; align-items:center; background:var(--surface-elevated); padding:6px; border-radius:6px;">
-              <img src="${item.header_image}" style="width:60px; height:28px; object-fit:cover; border-radius:4px;">
+              <img src="${item.header_image || item.image || item.headerImage || `https://cdn.akamai.steamstatic.com/steam/apps/${item.id || item.appId}/header.jpg`}" style="width:60px; height:28px; object-fit:cover; border-radius:4px;">
               <div style="font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${item.name}</div>
             </div>
           `).join("")}
