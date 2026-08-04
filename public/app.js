@@ -3002,6 +3002,7 @@ function initCoopWishlistModal() {
   const runBtn = document.getElementById("runCoopWishlistBtn");
   const input = document.getElementById("coopWishlistInput");
   const results = document.getElementById("coopWishlistResults");
+  const sortBar = document.getElementById("coopSortBar");
 
   if (!modal || !openBtn) return;
 
@@ -3009,24 +3010,190 @@ function initCoopWishlistModal() {
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
 
+  let _lastMatches = [];
+  let _lastPlayers = [];
+  let _lastStats = {};
+
+  function getSmartScore(m) {
+    let score = 0;
+    score += (m.matchCount / (m.totalUsers || 1)) * 40;  // 40pts match ratio
+    score += Math.min(m.discountPercent, 80) * 0.3;       // up to 24pts for discount
+    if (m.isCoop) score += 20;                            // 20pts coop bonus
+    if (m.isFree) score += 10;                            // 10pts free
+    if (m.priceAmount && m.priceAmount > 0) {
+      // Lower price gets more points (relative to 500k VND ceiling)
+      score += Math.max(0, 16 - (m.priceAmount / 100000));
+    }
+    return score;
+  }
+
+  function sortMatches(matches, mode) {
+    const copy = [...matches];
+    switch (mode) {
+      case "match":   return copy.sort((a, b) => b.matchCount - a.matchCount);
+      case "discount": return copy.sort((a, b) => b.discountPercent - a.discountPercent);
+      case "price":   return copy.sort((a, b) => (a.priceAmount || Infinity) - (b.priceAmount || Infinity));
+      case "coop":    return copy.sort((a, b) => (b.isCoop ? 1 : 0) - (a.isCoop ? 1 : 0));
+      default:        return copy.sort((a, b) => getSmartScore(b) - getSmartScore(a));
+    }
+  }
+
+  function renderMatches(matches, players, stats) {
+    const playerBadges = players && players.length
+      ? players.map(p => `
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:20px;border:1px solid var(--border);">
+            <img src="${p.avatar}" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--border);" onerror="this.style.display='none'">
+            <span style="font-size:12px;font-weight:600;color:var(--text-primary);">${p.personaname}</span>
+          </div>`).join("")
+      : `<span style="font-size:12px;color:var(--text-muted);">${stats.totalAnalyzed} thành viên</span>`;
+
+    const matchCards = matches.map((m, idx) => {
+      const priceVND = m.priceAmount ? m.priceAmount / 100 : null;
+      const score = Math.round(getSmartScore(m));
+      const scoreColor = score >= 60 ? '#27ae60' : score >= 40 ? '#f39c12' : '#888';
+      const displayPrice = m.isFree ? 'Miễn phí' : priceVND ? priceVND.toLocaleString('vi-VN') + 'đ' : 'Chưa có giá';
+      const totalBill = priceVND && m.matchCount ? (priceVND * m.matchCount).toLocaleString('vi-VN') + 'đ' : null;
+      const perPerson = priceVND ? priceVND.toLocaleString('vi-VN') + 'đ/người' : null;
+      const steamCartUrl = `https://store.steampowered.com/cart/addtocart/${m.appId}`;
+
+      return `
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;"
+             onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.4)'"
+             onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <!-- Game banner row -->
+          <div style="display:flex;gap:0;">
+            <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener" style="text-decoration:none;flex-shrink:0;">
+              <img src="${m.banner}" style="width:140px;height:65px;object-fit:cover;display:block;"
+                   onerror="this.src='https://cdn.akamai.steamstatic.com/steam/apps/${m.appId}/header.jpg'">
+            </a>
+            <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener"
+                   style="text-decoration:none;font-weight:700;font-size:14px;color:var(--text-primary);line-height:1.3;">${m.name}</a>
+                <!-- Score badge -->
+                <div style="flex-shrink:0;text-align:center;background:rgba(0,0,0,0.3);border-radius:8px;padding:2px 8px;border:1px solid ${scoreColor}40;">
+                  <div style="font-size:15px;font-weight:800;color:${scoreColor};">${score}</div>
+                  <div style="font-size:9px;color:var(--text-muted);margin-top:-2px;">SCORE</div>
+                </div>
+              </div>
+              <!-- Badges row -->
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
+                <span style="font-size:10px;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700;">👥 ${m.matchCount}/${m.totalUsers} trùng</span>
+                ${m.isCoop ? `<span style="font-size:10px;background:#27ae6020;color:#27ae60;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #27ae6040;">🎮 Co-op</span>` : ''}
+                ${m.discountPercent > 0 ? `<span style="font-size:10px;background:#e74c3c20;color:#e74c3c;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #e74c3c40;">🔥 -${m.discountPercent}%</span>` : ''}
+                ${idx === 0 ? `<span style="font-size:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">⭐ Đề Xuất #1</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <!-- Price + action row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);">
+            <div>
+              <span style="font-weight:800;font-size:16px;color:var(--success);">${displayPrice}</span>
+              ${perPerson ? `<span style="font-size:11px;color:var(--text-muted);margin-left:8px;">~${perPerson}</span>` : ''}
+              ${totalBill ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Tổng nhóm: <strong style="color:var(--text-secondary);">${totalBill}</strong></div>` : ''}
+            </div>
+            <a href="${steamCartUrl}" target="_blank" rel="noopener"
+               style="text-decoration:none;background:linear-gradient(135deg,#1b2838,#2a475e);color:#c7d5e0;font-size:12px;font-weight:700;padding:7px 16px;border-radius:8px;border:1px solid #4b6a88;transition:all 0.2s;display:flex;align-items:center;gap:5px;white-space:nowrap;"
+               onmouseover="this.style.background='linear-gradient(135deg,#2a475e,#1b2838)';this.style.color='#fff'"
+               onmouseout="this.style.background='linear-gradient(135deg,#1b2838,#2a475e)';this.style.color='#c7d5e0'">
+              🛒 Chốt Game
+            </a>
+          </div>
+        </div>`;
+    }).join("");
+
+    // Summary stats bar
+    const coopCount = matches.filter(m => m.isCoop).length;
+    const onSaleCount = matches.filter(m => m.discountPercent > 0).length;
+
+    results.innerHTML = `
+      <!-- Player team bar -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px;background:rgba(102,126,234,0.08);border:1px solid rgba(102,126,234,0.2);border-radius:12px;">
+        <span style="font-size:12px;color:var(--text-muted);font-weight:600;">TỔ ĐỘI:</span>
+        ${playerBadges}
+      </div>
+
+      <!-- Stats bar -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--primary);">${matches.length}</div>
+          <div style="font-size:11px;color:var(--text-muted);">Game trùng</div>
+        </div>
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#27ae60;">${coopCount}</div>
+          <div style="font-size:11px;color:var(--text-muted);">Game Co-op</div>
+        </div>
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#e74c3c;">${onSaleCount}</div>
+          <div style="font-size:11px;color:var(--text-muted);">Đang giảm giá</div>
+        </div>
+      </div>
+
+      <!-- Game cards -->
+      ${matchCards}
+    `;
+  }
+
+  // Sort bar interaction
+  sortBar?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".coop-sort-btn");
+    if (!btn || !_lastMatches.length) return;
+    sortBar.querySelectorAll(".coop-sort-btn").forEach(b => {
+      b.style.background = "transparent";
+      b.style.color = "var(--text-secondary)";
+      b.style.borderColor = "var(--border)";
+    });
+    btn.style.background = "var(--primary-soft)";
+    btn.style.color = "var(--primary)";
+    btn.style.borderColor = "var(--primary)";
+    const sorted = sortMatches(_lastMatches, btn.dataset.sort);
+    const cardContainer = results.querySelector("div:last-of-type");
+    if (cardContainer) {
+      const rerendered = sortMatches(_lastMatches, btn.dataset.sort).map((m, idx) => {
+        // Re-render just the cards section
+        return "";
+      });
+    }
+    renderMatches(sortMatches(_lastMatches, btn.dataset.sort), _lastPlayers, _lastStats);
+  });
+
   runBtn?.addEventListener("click", async () => {
     const rawVal = input?.value || "";
     if (!rawVal.trim()) {
-      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Vui lòng nhập ít nhất 2 Steam ID hoặc link profile.</div>`;
+      results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;">⚠️ Vui lòng nhập ít nhất 2 Steam ID hoặc link profile.</div>`;
       return;
     }
 
-    results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite;">🔄 Đang quét live Wishlist từ Steam API...</div></div>`;
+    // Skeleton loader
+    results.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:10px;animation:pulse 1.5s ease-in-out infinite;">
+        ${[1,2,3].map(() => `
+          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;height:130px;">
+            <div style="display:flex;gap:0;">
+              <div style="width:140px;height:65px;background:var(--surface-hover);"></div>
+              <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:8px;">
+                <div style="height:14px;background:var(--surface-hover);border-radius:4px;width:60%;"></div>
+                <div style="height:10px;background:var(--surface-hover);border-radius:4px;width:40%;"></div>
+              </div>
+            </div>
+            <div style="height:45px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);"></div>
+          </div>
+        `).join("")}
+      </div>
+      <div style="text-align:center;color:var(--text-muted);font-size:13px;margin-top:8px;">🔄 Đang quét Wishlist realtime từ Steam API...</div>
+    `;
+    if (sortBar) sortBar.style.display = "none";
 
     try {
       const res = await fetch(`/api/wishlist/compare?steamIds=${encodeURIComponent(rawVal)}`);
       const data = await res.json();
+
       if (!res.ok) {
-        let errHtml = `<div style="color:var(--error); text-align:center; padding:12px;">${data.error || "Không thể so sánh Wishlist"}</div>`;
+        let errHtml = `<div style="color:var(--error);text-align:center;padding:16px;background:rgba(231,76,60,0.1);border-radius:10px;border:1px solid rgba(231,76,60,0.3);">❌ ${data.error || "Không thể so sánh Wishlist"}</div>`;
         if (data.details && data.details.length) {
-          errHtml += `<div style="font-size:12px; color:var(--text-muted); text-align:left; margin-top:8px; background:var(--bg-primary); padding:10px; border-radius:4px;">`;
+          errHtml += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;background:var(--bg-primary);padding:10px;border-radius:8px;">`;
           data.details.forEach(d => {
-            errHtml += `<div style="margin-bottom:4px;">• <strong style="color:var(--primary)">${d.steamId}</strong>: ${d.error}</div>`;
+            errHtml += `<div style="padding:4px 0;border-bottom:1px solid var(--border);">• <strong style="color:var(--primary)">${d.steamId}</strong>: ${d.error}</div>`;
           });
           errHtml += `</div>`;
         }
@@ -3035,63 +3202,28 @@ function initCoopWishlistModal() {
       }
 
       if (!data.matches || !data.matches.length) {
-        results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy tựa game nào trùng nhau trong Wishlist công khai của các tài khoản này.</div>`;
+        results.innerHTML = `
+          <div style="text-align:center;padding:30px;color:var(--text-muted);">
+            <div style="font-size:40px;margin-bottom:10px;">🎯</div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Không tìm thấy game trùng nhau!</div>
+            <div style="font-size:13px;">Mọi người có Wishlist khác nhau hoàn toàn. Hãy thêm game yêu thích vào Wishlist rồi thử lại!</div>
+          </div>`;
         return;
       }
 
-      const playerBadges = data.players && data.players.length
-        ? data.players.map(p => `
-            <div style="display:flex; align-items:center; gap:6px; background:var(--surface-elevated); padding:4px 8px; border-radius:20px;">
-              <img src="${p.avatar}" style="width:20px; height:20px; border-radius:50%;" onerror="this.style.display='none'">
-              <span style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.personaname}</span>
-            </div>`).join("")
-        : `<span style="font-size:12px; color:var(--text-muted);">${data.totalAnalyzed} thành viên</span>`;
+      _lastMatches = sortMatches(data.matches, "smart");
+      _lastPlayers = data.players || [];
+      _lastStats = { totalAnalyzed: data.totalAnalyzed };
 
-      const matchCards = data.matches.map(m => {
-        const pricePerPerson = m.priceAmount ? (m.priceAmount / 100).toLocaleString('vi-VN') : null;
-        const totalBill = m.priceAmount ? (m.priceAmount * m.matchCount / 100).toLocaleString('vi-VN') : null;
-        const currency = m.priceCurrency || 'VND';
-        const currencySymbol = currency === 'USD' ? '$' : (currency === 'EUR' ? '€' : '₫');
-        const displayPrice = m.priceAmount
-          ? `${currencySymbol}${(m.priceAmount/100).toLocaleString('vi-VN')}`
-          : (m.isFree ? 'Miễn phí' : 'Chưa có giá');
+      if (sortBar) sortBar.style.display = "flex";
+      renderMatches(_lastMatches, _lastPlayers, _lastStats);
 
-        return `
-          <a href="https://store.steampowered.com/app/${m.appId}" target="_blank" rel="noopener" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--primary)';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <img src="${m.banner}" style="width:100px; height:46px; object-fit:cover; border-radius:6px;" onerror="this.src='https://cdn.akamai.steamstatic.com/steam/apps/${m.appId}/header.jpg'">
-              <div>
-                <div style="font-weight:700; font-size:14px; color:var(--text-primary); display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                  ${m.name}
-                  ${m.isCoop ? `<span style="font-size:10px; background:#27ae60; color:#fff; padding:2px 6px; border-radius:10px; font-weight:600;">🎮 Co-op</span>` : ''}
-                </div>
-                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                  <span style="font-size:11px; background:var(--primary-soft); color:var(--primary); padding:2px 8px; border-radius:10px; font-weight:600;">👥 Trùng ${m.matchCount}/${m.totalUsers} người</span>
-                  ${pricePerPerson ? `<span style="font-size:11px; background:var(--surface-hover); color:var(--text-secondary); padding:2px 6px; border-radius:10px;">~${pricePerPerson}đ/người</span>` : ''}
-                  ${m.discountPercent > 0 ? `<span style="font-size:11px; background:var(--error); color:#fff; padding:2px 6px; border-radius:10px; font-weight:700;">-${m.discountPercent}%</span>` : ''}
-                </div>
-              </div>
-            </div>
-            <div style="text-align:right; flex-shrink:0;">
-              <div style="font-weight:700; color:var(--success); font-size:15px;">${displayPrice}</div>
-              ${totalBill ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Tổng ${totalBill}đ</div>` : ''}
-            </div>
-          </a>`;
-      }).join("");
-
-      results.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; background:var(--bg-primary); padding:10px; border-radius:8px;">
-          <span style="font-size:12px; color:var(--text-muted);">Tổ đội:</span>
-          ${playerBadges}
-        </div>
-        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Tìm thấy <strong style="color:var(--text-primary);">${data.matchedCount}</strong> game xuất hiện chung trong Wishlist:</div>
-        ${matchCards}
-      `;
     } catch (err) {
-      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">${err.message}</div>`;
+      results.innerHTML = `<div style="color:var(--error);text-align:center;padding:16px;">⚠️ ${err.message}</div>`;
     }
   });
 }
+
 
 // 3. REAL-COST SAVINGS CALCULATOR
 function initRealCostModal() {

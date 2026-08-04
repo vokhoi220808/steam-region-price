@@ -860,22 +860,49 @@
   </div>
 
   <!-- CO-OP WISHLIST MATCHER MODAL -->
-  <div id="coopWishlistModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
-    <div style="background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 680px; padding: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
-        <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">👥 Match Wishlist Bạn Bè Realtime</h3>
-        <button id="closeCoopWishlistModal" class="btn icon-only" style="font-size: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+  <div id="coopWishlistModal" class="modal hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:var(--surface-elevated);border:1px solid var(--border);border-radius:20px;width:100%;max-width:740px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.05);">
+
+      <!-- Header -->
+      <div style="padding:24px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+          <div>
+            <h3 style="font-size:22px;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:10px;margin:0;">
+              <span style="background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">👥</span>
+              Party Game Finder
+            </h3>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Nhập Steam ID hoặc link profile — hệ thống tự quét Wishlist và tìm game cả nhóm đều muốn mua!</p>
+          </div>
+          <button id="closeCoopWishlistModal" style="background:var(--surface-hover);border:none;color:var(--text-muted);cursor:pointer;border-radius:50%;width:32px;height:32px;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;" onmouseover="this.style.background='var(--error)';this.style.color='#fff'" onmouseout="this.style.background='var(--surface-hover)';this.style.color='var(--text-muted)'">✕</button>
+        </div>
+
+        <!-- Input row -->
+        <div style="display:flex;gap:10px;align-items:flex-end;">
+          <textarea id="coopWishlistInput" rows="2"
+            placeholder="Ví dụ: https://steamcommunity.com/id/vokhoi, 76561198669536462"
+            style="flex:1;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-primary);outline:none;font-family:inherit;resize:none;line-height:1.5;transition:border 0.2s;"
+            onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button id="runCoopWishlistBtn" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-size:14px;font-weight:700;padding:0 22px;height:60px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:opacity 0.2s;min-width:140px;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            🔍 So Sánh
+          </button>
+        </div>
+
+        <!-- Sort pills (hidden until results load) -->
+        <div id="coopSortBar" style="display:none;gap:6px;margin-top:12px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--text-muted);align-self:center;">Sắp xếp:</span>
+          <button class="coop-sort-btn active-sort" data-sort="smart" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--primary);background:var(--primary-soft);color:var(--primary);cursor:pointer;">⭐ Gợi Ý</button>
+          <button class="coop-sort-btn" data-sort="match" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;">👥 Trùng nhiều</button>
+          <button class="coop-sort-btn" data-sort="discount" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;">🔥 Giảm sâu</button>
+          <button class="coop-sort-btn" data-sort="price" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;">💰 Giá thấp</button>
+          <button class="coop-sort-btn" data-sort="coop" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;">🎮 Co-op</button>
+        </div>
       </div>
-      <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Nhập 2 đến 5 Steam ID (17 chữ số) hoặc link profile của nhóm bạn. Máy chủ sẽ truy vấn live Wishlist công khai và tự động lọc ra các tựa game trùng khớp mà mọi người cùng muốn mua!</p>
-      
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-        <textarea id="coopWishlistInput" rows="3" placeholder="Nhập từng Steam ID hoặc link profile phân cách bằng dấu phẩy&#10;Ví dụ: 76561198012345678, 76561198087654321" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit;"></textarea>
-        <button id="runCoopWishlistBtn" class="btn btn-primary" style="height: 42px; font-weight: 700; align-self: flex-end; padding: 0 24px;">So Sánh Wishlist Nhóm</button>
-      </div>
-      
-      <div id="coopWishlistResults" style="display: flex; flex-direction: column; gap: 12px;"></div>
+
+      <!-- Scrollable results -->
+      <div id="coopWishlistResults" style="flex:1;overflow-y:auto;padding:16px 24px 24px;display:flex;flex-direction:column;gap:10px;"></div>
     </div>
   </div>
+
 
   <!-- REAL-COST SAVINGS CALCULATOR MODAL -->
   <div id="realCostModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;">
