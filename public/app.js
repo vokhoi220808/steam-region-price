@@ -806,23 +806,50 @@ function formatCountdown(milliseconds) {
   return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+function getEventTheme(eventId) {
+  if (eventId.includes("cyberpunk")) return "linear-gradient(135deg, rgba(0, 255, 204, 0.25), rgba(128, 0, 255, 0.25))";
+  if (eventId.includes("autumn") || eventId.includes("scream")) return "linear-gradient(135deg, rgba(255, 107, 0, 0.25), rgba(255, 0, 0, 0.25))";
+  if (eventId.includes("winter") || eventId.includes("spring")) return "linear-gradient(135deg, rgba(0, 195, 255, 0.25), rgba(0, 81, 255, 0.25))";
+  if (eventId.includes("summer")) return "linear-gradient(135deg, rgba(255, 214, 0, 0.25), rgba(255, 107, 0, 0.25))";
+  return "linear-gradient(135deg, rgba(58, 168, 255, 0.15), rgba(30, 80, 150, 0.15))";
+}
+
 function renderSaleCalendar() {
   const grid = document.getElementById("saleCalendarGrid");
   const loading = document.getElementById("saleCalendarLoading");
   if (!grid || !saleCalendarData?.events?.length) return;
   const now = Date.now();
-  const events = saleCalendarData.events.slice(0, 4);
+  // Show up to 6 events in the carousel
+  const events = saleCalendarData.events.slice(0, 6);
   const valveDate = { day: "2-digit", month: "2-digit", timeZone: "America/Los_Angeles" };
+  
   grid.innerHTML = events.map((event, index) => {
     const start = new Date(event.start);
     const end = new Date(event.end);
     const active = start.getTime() <= now && end.getTime() > now;
     const target = active ? end : start;
-    return `<article class="sale-event ${index === 0 ? "is-next" : ""}" data-sale-target="${target.toISOString()}">
-      <span class="sale-event-label">${active ? "Đang diễn ra" : (index === 0 ? "Sự kiện tiếp theo" : event.kind === "seasonal" ? "Seasonal Sale" : "Festival")}</span>
+    
+    let progressHtml = "";
+    if (active) {
+      const totalDuration = end.getTime() - start.getTime();
+      const elapsed = now - start.getTime();
+      const progressPercent = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+      progressHtml = `
+        <div class="sale-progress-bg" title="Tiến độ sự kiện: ${progressPercent.toFixed(1)}%">
+          <div class="sale-progress-bar" style="width: ${progressPercent}%"></div>
+        </div>
+      `;
+    }
+
+    const theme = getEventTheme(event.id);
+    
+    return `<article class="sale-event ${index === 0 ? "is-next" : ""}" data-sale-target="${target.toISOString()}" style="background: ${theme};">
+      <span class="sale-event-label" style="background: ${active ? 'var(--primary)' : 'rgba(0,0,0,0.5)'}">${active ? "Đang diễn ra" : (index === 0 ? "Sự kiện tiếp theo" : event.kind === "seasonal" ? "Seasonal Sale" : "Festival")}</span>
       <h4 title="${event.name}">${event.name}</h4>
       <div class="sale-event-date">${start.toLocaleDateString("vi-VN", valveDate)} – ${end.toLocaleDateString("vi-VN", { ...valveDate, year: "numeric" })} (PT)</div>
       <div class="sale-countdown">${active ? "Kết thúc sau " : "Còn "}${formatCountdown(target.getTime() - now)}</div>
+      ${progressHtml}
+      ${active ? `<div style="margin-top: 12px;"><button onclick="document.querySelector('.deals-tabs-container').scrollIntoView({behavior: 'smooth'})" style="width:100%; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Khám Phá Ngay</button></div>` : ''}
     </article>`;
   }).join("");
   loading?.classList.add("hidden");
@@ -1882,6 +1909,26 @@ function updateDealsCountdowns() {
     if (!output || !Number.isFinite(target)) return;
     const active = event.querySelector('.sale-event-label')?.textContent === 'Đang diễn ra';
     output.textContent = `${active ? 'Kết thúc sau ' : 'Còn '}${formatCountdown(target - Date.now())}`;
+    
+    if (active) {
+      // Data target is the end time. To get the start time, we need to extract it from the calendar data.
+      // But we can extract it from the string or just use the global `saleCalendarData`
+      const eventName = event.querySelector('h4')?.textContent;
+      const eventData = saleCalendarData?.events?.find(e => e.name === eventName);
+      if (eventData) {
+        const start = new Date(eventData.start).getTime();
+        const end = new Date(eventData.end).getTime();
+        const now = Date.now();
+        const totalDuration = end - start;
+        const elapsed = now - start;
+        const progressPercent = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+        
+        const progressBar = event.querySelector('.sale-progress-bar');
+        const progressBg = event.querySelector('.sale-progress-bg');
+        if (progressBar) progressBar.style.width = `${progressPercent}%`;
+        if (progressBg) progressBg.title = `Tiến độ sự kiện: ${progressPercent.toFixed(1)}%`;
+      }
+    }
   });
 }
 
