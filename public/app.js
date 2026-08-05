@@ -3006,8 +3006,8 @@ function initBudgetComboModal() {
         const appId = Number(item.id || item.appId);
         const meta = metadataMap.get(appId);
         if (!meta || !meta.tags) return false;
-        // MUST contain ALL selected genres (AND logic)
-        return selectedGenres.every(g => 
+        // Game only needs to contain AT LEAST ONE of the selected genres (OR logic)
+        return selectedGenres.some(g => 
           meta.tags.some(t => t.toLowerCase().includes(g.toLowerCase()))
         );
       });
