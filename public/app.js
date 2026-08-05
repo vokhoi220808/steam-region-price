@@ -3016,10 +3016,11 @@ function initBudgetComboModal() {
     }
 
     if (!pool.length) {
+      const filterText = discountFilter === "full_only" ? "nguyên giá" : discountFilter === "discount_only" ? "đang giảm giá" : "nào";
       if (selectedGenres.length > 0) {
-        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game chứa đủ các thể loại <strong>${selectedGenres.join(", ")}</strong> đang giảm giá trong pool hiện tại. Thử bớt thể loại nhé!</div>`;
+        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game ${filterText} chứa đủ các thể loại <strong>${selectedGenres.join(", ")}</strong> trong dữ liệu hiện tại. Thử bớt thể loại nhé!</div>`;
       } else {
-        results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;background:rgba(231,76,60,0.08);border-radius:12px;border:1px solid rgba(231,76,60,0.2);">❌ Không thể tải dữ liệu deal từ Steam. Vui lòng thử lại sau.</div>`;
+        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game ${filterText} nào trong dữ liệu hiện tại. Thử đổi bộ lọc nhé!</div>`;
       }
       return;
     }
@@ -3066,6 +3067,7 @@ function initBudgetComboModal() {
     findCombos(poolRand, 0.75, 6); // Find varied combos
 
     if (!combos.length) findCombos(poolDesc, 0.60, 4); // Fallback
+    if (!combos.length) findCombos(poolDesc, 0.02, 10); // Extreme fallback for very large budgets
 
     // Dedup
     const uniqMap = new Map();
@@ -3110,11 +3112,12 @@ function initBudgetComboModal() {
     const topCombos = finalCombos;
 
     if (!topCombos.length) {
+      const filterText = discountFilter === "full_only" ? "nguyên giá" : discountFilter === "discount_only" ? "đang giảm giá" : "";
       results.innerHTML = `
         <div style="text-align:center;padding:30px;color:var(--text-muted);">
           <div style="font-size:40px;margin-bottom:10px;">🎯</div>
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Không tìm được combo khít!</div>
-          <div style="font-size:13px;">Ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> chưa đủ cho 2+ game đang giảm giá. Thử tăng lên nhé!</div>
+          <div style="font-size:13px;">Ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> chưa đủ (hoặc quá lớn) để khớp với các game ${filterText} hiện có. Thử đổi ngân sách nhé!</div>
         </div>`;
       return;
     }
