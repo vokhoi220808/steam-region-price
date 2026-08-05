@@ -78,10 +78,10 @@ const METADATA_TTL = 6 * 60 * 60 * 1000;
 const LIVE_STATS_TTL = 5 * 60 * 1000;
 
 const STEAM_SALE_EVENTS = [
-  { id: "cyberpunk-2026", name: "Cyberpunk Fest", kind: "festival", start: "2026-08-03T17:00:00Z", end: "2026-08-10T17:00:00Z", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=600&auto=format&fit=crop" },
-  { id: "pins-pegs-2026", name: "Pins & Pegs Fest", kind: "festival", start: "2026-08-17T17:00:00Z", end: "2026-08-20T17:00:00Z", image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?q=80&w=600&auto=format&fit=crop" },
-  { id: "pve-survival-2026", name: "PvE Survival Crafting Fest", kind: "festival", start: "2026-08-31T17:00:00Z", end: "2026-09-07T17:00:00Z", image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600&auto=format&fit=crop" },
-  { id: "programming-2026", name: "Programming Fest", kind: "festival", start: "2026-09-10T17:00:00Z", end: "2026-09-14T17:00:00Z", image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600&auto=format&fit=crop" },
+  { id: "cyberpunk-2026", name: "Cyberpunk Fest", kind: "festival", start: "2026-08-03T17:00:00Z", end: "2026-08-10T17:00:00Z", image: "./images/events/cyberpunk_fest.jpg" },
+  { id: "pins-pegs-2026", name: "Pins & Pegs Fest", kind: "festival", start: "2026-08-17T17:00:00Z", end: "2026-08-20T17:00:00Z", image: "./images/events/pins_pegs_fest.jpg" },
+  { id: "pve-survival-2026", name: "PvE Survival Crafting Fest", kind: "festival", start: "2026-08-31T17:00:00Z", end: "2026-09-07T17:00:00Z", image: "./images/events/pve_survival.jpg" },
+  { id: "programming-2026", name: "Programming Fest", kind: "festival", start: "2026-09-10T17:00:00Z", end: "2026-09-14T17:00:00Z", image: "./images/events/programming_fest.jpg" },
   { id: "party-rpg-2026", name: "Party-Based RPG Fest", kind: "festival", start: "2026-09-14T17:00:00Z", end: "2026-09-21T17:00:00Z", image: "https://images.unsplash.com/photo-1588880629555-d14f48ff7989?q=80&w=600&auto=format&fit=crop" },
   { id: "autumn-2026", name: "Steam Autumn Sale", kind: "seasonal", start: "2026-10-01T17:00:00Z", end: "2026-10-08T17:00:00Z", image: "https://images.unsplash.com/photo-1507368297750-f8fb2fa174da?q=80&w=600&auto=format&fit=crop" },
   { id: "cooking-2026", name: "Cooking Fest", kind: "festival", start: "2026-10-12T17:00:00Z", end: "2026-10-19T17:00:00Z", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=600&auto=format&fit=crop" },
