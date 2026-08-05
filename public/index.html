@@ -871,7 +871,7 @@
         </div>
 
         <!-- Input row -->
-        <div style="display:flex;gap:10px;align-items:center;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
           <div style="flex:1;position:relative;">
             <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-muted);font-weight:700;pointer-events:none;">₫</span>
             <input type="number" id="budgetComboInput" placeholder="150000"
@@ -890,7 +890,17 @@
               style="position:absolute;top:100%;left:0;right:0;margin-top:6px;background:var(--surface-elevated);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);max-height:250px;overflow-y:auto;z-index:100;padding:6px;display:flex;flex-direction:column;gap:2px;">
             </div>
           </div>
+        </div>
 
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+          <div style="flex:1;position:relative;">
+            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-muted);pointer-events:none;">💲</span>
+            <select id="discountFilter" style="width:100%;height:46px;padding:0 14px 0 34px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-primary);outline:none;cursor:pointer;appearance:none;">
+              <option value="discount_only" selected>Chỉ tìm game đang giảm giá (Mặc định)</option>
+              <option value="all">Trộn lẫn (Cả giảm giá & nguyên giá)</option>
+              <option value="full_only">Chỉ tìm game nguyên giá</option>
+            </select>
+          </div>
           <button id="runBudgetComboBtn"
             style="background:linear-gradient(135deg,#f39c12,#e74c3c);border:none;color:#fff;font-size:14px;font-weight:700;padding:0 24px;height:46px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:opacity 0.2s;min-width:130px;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🎯 Tìm Combo</button>

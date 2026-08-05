@@ -2965,15 +2965,21 @@ function initBudgetComboModal() {
       }
     } catch (e) {}
 
-    // Deduplicate pool
+    // Deduplicate and filter pool
+    const discountFilter = document.getElementById("discountFilter")?.value || "discount_only";
     const seen = new Set();
     let pool = rawPool.filter(item => {
       const id = item.id || item.appId;
       const rawPrice = Number(item.final_price || item.finalPrice || (item.price && item.price.final) || 0);
       const price = rawPrice / 100;
       if (!id || seen.has(id) || price <= 0) return false;
+      
+      const discountPct = item.discount_percent || item.discountPercent || 0;
+      if (discountFilter === "discount_only" && discountPct <= 0) return false;
+      if (discountFilter === "full_only" && discountPct > 0) return false;
+      
       item._calcPrice = price;
-      item._discountPct = item.discount_percent || item.discountPercent || 0;
+      item._discountPct = discountPct;
       seen.add(id);
       return true;
     });
