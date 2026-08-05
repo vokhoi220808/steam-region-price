@@ -67,10 +67,16 @@ Công cụ mã nguồn mở cao cấp hỗ trợ so sánh giá game Steam trên 
 - **Quản lý Cron Runs & Retry Queue**: Theo dõi số lượt quét cron, các yêu cầu đẩy thông báo bị lỗi và tự động thực hiện lại (retry với exponential backoff).
 - **Rate Limiting & Redis Cache**: Tích hợp Upstash Redis / Memory Fallback giúp hạn chế quá tải API và tối ưu tốc độ phản hồi.
 
-### 🌏 6. So sánh giá 27 khu vực
+### 🌏 6. Cơ sở dữ liệu Khổng lồ & Tìm kiếm Thông minh
+- **Thư viện 3,000+ Games**: Mở rộng kho dữ liệu tự động quét và phân tích hơn 3,000 tựa game hot nhất trên Steam.
+- **Bộ lọc Thể loại Nâng cao (OR-Logic)**: Tìm kiếm linh hoạt nhiều thể loại cùng lúc (ví dụ: Action *hoặc* Indie) để khám phá game dễ dàng hơn.
 - Tra cứu nhanh bằng Tên, App ID, Package ID hoặc Link Steam.
-- Hỗ trợ 27 quốc gia: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PLN, CH, HK, RU, TW, AR, UA, AE.
-- Tỷ giá thời gian thực quy đổi trực tiếp về Đồng Việt Nam (VND) hoặc bất kỳ ngoại tệ nào.
+- Hỗ trợ 27 quốc gia/khu vực và tỷ giá thời gian thực quy đổi trực tiếp về Đồng Việt Nam (VND).
+
+### 🗓️ 7. Lịch Sự Kiện Sale Tương Tác
+- **Premium Sale Carousel**: Giao diện Lịch Sự Kiện được thiết kế lại hoàn toàn với phong cách thẻ trượt ngang (Carousel), hiệu ứng Glassmorphism và Gradient cao cấp.
+- **Tiến độ Thời gian Thực**: Thanh tiến độ (Progress bar) đếm ngược trực quan từng giây cho các sự kiện đang diễn ra.
+- Hiển thị trực tiếp các lễ hội và mùa Sale lớn của Steam để chuẩn bị ngân sách.
 
 ---
 

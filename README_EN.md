@@ -67,10 +67,16 @@ An advanced open-source web application designed to compare Steam game prices ac
 - **Cron Runs & Retry Queue**: Tracks cron execution metrics, failed notification attempts, and automated retries using exponential backoff.
 - **Rate Limiting & Redis Cache**: Integrates Upstash Redis with in-memory fallback to prevent API rate limits and maximize response speed.
 
-### 🌏 6. 27-Region Price Comparison
+### 🌏 6. Massive Database & Smart Filtering
+- **3,000+ Games Library**: Expanded backend data scraping to automatically track and analyze over 3,000 top Steam games.
+- **Advanced Genre Filters (OR-Logic)**: Flexible multi-genre search (e.g., Action *or* Indie) for better game discovery.
 - Fast lookup by Name, App ID, Package ID, or Steam URL.
-- Supports 27 regions: VN, US, UK, EU, JP, KR, CN, BR, MX, CA, AU, IN, ID, PH, TH, SG, MY, TR, ZA, PL, CH, HK, RU, TW, AR, UA, AE.
-- Real-time exchange rate conversion to any currency.
+- Supports 27 regions with real-time exchange rate conversions.
+
+### 🗓️ 7. Interactive Sale Calendar
+- **Premium Sale Carousel**: Completely redesigned Steam Sales Calendar featuring a horizontal-scrolling carousel, Glassmorphism, and premium CSS gradients.
+- **Real-Time Progress**: Live countdown progress bars for currently active events.
+- Tracks major Steam festivals and seasonal sales to help you plan your budget.
 
 ---
 
