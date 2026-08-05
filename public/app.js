@@ -844,8 +844,7 @@ function renderSaleCalendar() {
     const theme = getEventTheme(event.id);
     
     return `<article class="sale-event ${index === 0 ? "is-next" : ""}" data-sale-target="${target.toISOString()}" style="background: ${theme};">
-      <span class="sale-event-label" style="background: ${active ? 'var(--primary)' : 'rgba(0,0,0,0.5)'}; position: absolute; top: 12px; left: 12px; z-index: 2;">${active ? "Đang diễn ra" : (index === 0 ? "Sự kiện tiếp theo" : event.kind === "seasonal" ? "Seasonal Sale" : "Festival")}</span>
-      ${event.image ? `<img src="${event.image}" alt="${event.name}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; margin-top: -8px;" loading="lazy" />` : ''}
+      <span class="sale-event-label" style="background: ${active ? 'var(--primary)' : 'rgba(0,0,0,0.5)'}">${active ? "Đang diễn ra" : (index === 0 ? "Sự kiện tiếp theo" : event.kind === "seasonal" ? "Seasonal Sale" : "Festival")}</span>
       <h4 title="${event.name}">${event.name}</h4>
       <div class="sale-event-date">${start.toLocaleDateString("vi-VN", valveDate)} – ${end.toLocaleDateString("vi-VN", { ...valveDate, year: "numeric" })} (PT)</div>
       <div class="sale-countdown">${active ? "Kết thúc sau " : "Còn "}${formatCountdown(target.getTime() - now)}</div>
