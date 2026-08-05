@@ -878,19 +878,18 @@
               style="width:100%;height:46px;padding:0 14px 0 32px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:15px;font-weight:700;color:var(--text-primary);outline:none;box-sizing:border-box;transition:border 0.2s;"
               onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
           </div>
-          <div style="flex:1;position:relative;">
-            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-muted);pointer-events:none;">🏷️</span>
-            <input type="text" id="budgetComboGenre" list="budgetGenreList" placeholder="Thể loại (Tùy chọn)..."
-              style="width:100%;height:46px;padding:0 14px 0 32px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-primary);outline:none;box-sizing:border-box;transition:border 0.2s;"
-              onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
-            <datalist id="budgetGenreList">
-              <option value="Indie"><option value="Action"><option value="Adventure"><option value="Casual"><option value="Singleplayer">
-              <option value="Simulation"><option value="RPG"><option value="Strategy"><option value="2D"><option value="Early Access">
-              <option value="3D"><option value="Free to Play"><option value="Atmospheric"><option value="Story Rich"><option value="Multiplayer">
-              <option value="Co-op"><option value="Online Co-Op"><option value="Survival"><option value="Anime"><option value="Horror">
-              <option value="Sci-fi"><option value="Sports"><option value="Racing"><option value="Open World"><option value="FPS">
-            </datalist>
+          
+          <div style="flex:1;position:relative;" id="budgetGenreWrapper">
+            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-muted);pointer-events:none;z-index:2;">🏷️</span>
+            <input type="text" id="budgetComboGenre" placeholder="Thể loại (VD: Co-op)..." autocomplete="off"
+              style="width:100%;height:46px;padding:0 30px 0 34px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-primary);outline:none;box-sizing:border-box;transition:border 0.2s, box-shadow 0.2s;">
+            <button id="clearGenreBtn" class="hidden" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;z-index:2;padding:0;display:flex;align-items:center;justify-content:center;">✕</button>
+            <!-- Custom Dropdown Menu -->
+            <div id="genreCustomDropdown" class="hidden"
+              style="position:absolute;top:100%;left:0;right:0;margin-top:6px;background:var(--surface-elevated);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);max-height:250px;overflow-y:auto;z-index:100;padding:6px;display:flex;flex-direction:column;gap:2px;">
+            </div>
           </div>
+
           <button id="runBudgetComboBtn"
             style="background:linear-gradient(135deg,#f39c12,#e74c3c);border:none;color:#fff;font-size:14px;font-weight:700;padding:0 24px;height:46px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:opacity 0.2s;min-width:130px;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🎯 Tìm Combo</button>

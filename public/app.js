@@ -2837,7 +2837,52 @@ function initBudgetComboModal() {
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
 
   const genreInput = document.getElementById("budgetComboGenre");
+  const genreDropdown = document.getElementById("genreCustomDropdown");
+  const clearGenreBtn = document.getElementById("clearGenreBtn");
+  const STEAM_TAGS = [
+    "Indie","Action","Adventure","Casual","Singleplayer","Simulation","RPG","Strategy","2D","Early Access","3D","Free to Play","Atmospheric","Story Rich","Colorful","Exploration","Fantasy","Multiplayer","Cute","Pixel Graphics","Combat","First-Person","Puzzle","Relaxing","Action-Adventure","Stylized","Funny","Arcade","Controller","Anime","Horror","PvE","Sci-fi","Co-op","Sports","Massively Multiplayer","Third Person","Choices Matter","Violent","Retro","Top-Down","Family Friendly","Shooter","Female Protagonist","Sexual Content","Dark","PvP","Realistic","Racing","Mystery","Linear","Multiple Endings","Open World","Nudity","Online Co-Op","Survival","Character Customization","Comedy","Cartoony","Visual Novel","Physics","Psychological Horror","Gore","Platformer","Magic","Roguelike","2D Platformer","Roguelite","Sandbox","Management","Resource Management","Old School","Tactical","Medieval","FPS","Hand-drawn","Action RPG","Immersive Sim","Turn-Based Combat","Minimalist","Turn-Based Strategy","Crafting","Futuristic","Building","Point & Click","Emotional","Dark Fantasy","Action Roguelike","Cartoon","Procedural Generation","Space","Difficult","3D Platformer","Interactive Fiction","Romance","Choose Your Own Adventure","Nature","Logic","Survival Horror","Turn-Based Tactics","Utilities","Local Multiplayer","Hentai","1990's","Base Building","Surreal","Hack and Slash","Incremental","Dating Sim","Hidden Object","VR","Bullet Hell","Side Scroller","Strategy RPG","Post-apocalyptic","Puzzle Platformer","Education","Walking Simulator","Dungeon Crawler","Lore-Rich","Cinematic","Life Sim","Tabletop","Score Attack","Dialogue Heavy","Inventory Management","Card Game","Text-Based","War","Shoot 'Em Up","Economy","Psychological","Stealth","JRPG","LGBTQ+","Zombies","Great Soundtrack","Idler","1980s","Design & Illustration","Investigation","Local Co-Op","2.5D","Historical","Thriller","Party-Based RPG","Supernatural","Tutorial","Isometric","Deckbuilding","Dark Humor","Nonlinear","Time Management","Turn-Based","Artificial Intelligence","Military","Top-Down Shooter","Replay Value","Third-Person Shooter","Demons","Team-Based","Loot","Aliens","Tactical RPG","Cyberpunk","Collectathon","Detective","Robots","Modern","Software","Dystopian","Real Time Tactics","Perma Death","Abstract","Tower Defense","Driving","CRPG","Board Game","RTS","Precision Platformer","Card Battler","Arena Shooter","Cozy","Souls-like","Comic Book","Psychedelic","Automation","City Builder","Co-op Campaign","Memes","Cats","Capitalism","Mythology","Wargame","Alternate History","Dragons","4 Player Local","Game Development","Creature Collector","Grid-Based Movement","Crime","Short","Level Editor","Destruction","Class-Based","Parkour","Fast-Paced","Flight","Beat 'em up","Moddable","Metroidvania","Animation & Modeling","Runner","Philosophical","Dark Comedy","Music","Trading","2D Fighter","Farming Sim","Cooking","Automobile Sim","Gun Customization","Soundtrack","Party Game","Auto Battler","3D Fighter","Competitive","Rhythm","Fighting","Vehicular Combat","eSports","MMORPG","Quick-Time Events","Noir","Conspiracy","Lovecraftian","Swordplay","Science","Colony Sim","Word Game","Twin Stick Shooter","Satire","Space Sim","Gothic","Parody","Grand Strategy","Mining","Wholesome","Dynamic Narration","Experimental","Looter Shooter","Video Production","Underground","Classic","Battle Royale","Narrative","Audio Production","Mystery Dungeon","Agriculture","6DOF","Bullet Time","Split Screen","World War II","Fishing","Time Manipulation","Roguelike Deckbuilder","Martial Arts","Gambling","Spectacle fighter","Mechs","Beautiful","Match 3","Combat Racing","Hero Shooter","Dogs","Asynchronous Multiplayer","Transportation","Shop Keeper","Immersive","FMV","Action RTS","Voxel","Open World Survival Craft","Ninja","Time Travel","Vampires","Trading Card Game","God Game","Solitaire","Otome","Steampunk","Pirates","Underwater","Boomer Shooter","Hex Grid","Software Training","Hunting","Hacking","Political Sim","Trains","Faith","Tanks","Typing","4X","MOBA","Sokoban","Programming","Assassins","Animals","Superhero","Remake","Party","Diplomacy","Bullet Heaven","Character Action Game","Dinosaurs","Western","Minigames","Photo Editing","Heist","Mouse Only","Cold War","Traditional Roguelike","Job Simulator","Naval","Snow","Transhumanism","Naval Combat","Sailing","Escape Room","Archery","Addictive","Horses","Real-Time","Nostalgia","Farming","Episodic","Music-Based Procedural Generation","Football (Soccer)","Werewolves","Epic","Trivia","Villain Protagonist","Offroad","Sniper","Time Attack","Real-Time with Pause","On-Rails Shooter","Sequel","Spelling","Mars","Outbreak Sim","World War I","Dwarves","Desktop Companion","Boxing","Chess","Spaceships","Touch-Friendly","Mod","Extraction Shooter","Medical Sim","Basketball","Social Deduction","Golf","Submarine","Motorbike","Baseball","Jump Scare","Gaming","Dice","Pinball","Rome","360 Video","Bikes","Elves","Electronic Music","Decorating","Boss Rush","Organizing","Asymmetric VR","Wrestling","Skateboarding","Silent Protagonist","Instrumental Music","Football (American)","Cleaning","Vikings","Mini Golf","Billiards","Wuxia","Skating","Rock Music","Xianxia","Cycling","Cult","Birds","Espionage","Tennis","TrackIR","Motocross","Intentionally Awkward Controls","Mahjong","Samurai","Poker","Foxes","Hockey","Bowling","Based On A Novel","Voice Control","ATV","Falling Blocks","8-bit Music","Hardware","Snowboarding","Skiing","Lemmings","BMX","Musou","Language Learning","Benchmark","Hobby Sim","Capybaras","Wolves","Zoo","Volleyball","Cricket","Rugby","Snooker","Reboot"
+  ];
 
+  function renderGenreDropdown(filter = "") {
+    if (!genreDropdown) return;
+    const lowerFilter = filter.toLowerCase();
+    const matches = STEAM_TAGS.filter(t => t.toLowerCase().includes(lowerFilter)).slice(0, 50);
+    
+    if (matches.length === 0) {
+      genreDropdown.innerHTML = `<div style="padding:10px 14px;color:var(--text-muted);font-size:13px;text-align:center;">Không tìm thấy thể loại phù hợp</div>`;
+    } else {
+      genreDropdown.innerHTML = matches.map(tag => `
+        <div class="genre-option" style="padding:10px 14px;border-radius:8px;font-size:13px;color:var(--text-primary);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;"
+             onmouseover="this.style.background='var(--surface-hover)';this.style.color='var(--primary)';this.style.transform='translateX(4px)'"
+             onmouseout="this.style.background='';this.style.color='var(--text-primary)';this.style.transform=''"
+             onmousedown="document.getElementById('budgetComboGenre').value='${tag}'; document.getElementById('genreCustomDropdown').classList.add('hidden'); document.getElementById('clearGenreBtn').classList.remove('hidden');">
+          <span style="font-size:12px;margin-right:8px;opacity:0.6;">▪</span> ${tag}
+        </div>
+      `).join("");
+    }
+  }
+
+  if (genreInput) {
+    genreInput.addEventListener("focus", () => {
+      renderGenreDropdown(genreInput.value);
+      genreDropdown?.classList.remove("hidden");
+    });
+    genreInput.addEventListener("input", (e) => {
+      renderGenreDropdown(e.target.value);
+      if (e.target.value) clearGenreBtn?.classList.remove("hidden");
+      else clearGenreBtn?.classList.add("hidden");
+    });
+    genreInput.addEventListener("blur", () => {
+      // Small timeout to allow click on dropdown to fire
+      setTimeout(() => genreDropdown?.classList.add("hidden"), 150);
+    });
+    clearGenreBtn?.addEventListener("click", () => {
+      genreInput.value = "";
+      clearGenreBtn.classList.add("hidden");
+      renderGenreDropdown("");
+      genreInput.focus();
+    });
+  }
   runBtn?.addEventListener("click", async () => {
     const budget = Number(input?.value);
     const targetGenre = genreInput?.value?.trim().toLowerCase();
