@@ -3115,11 +3115,30 @@ function initBudgetComboModal() {
 
     if (!topCombos.length) {
       const filterText = discountFilter === "full_only" ? "nguyên giá" : discountFilter === "discount_only" ? "đang giảm giá" : "";
+      
+      let explainText = `Ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> chưa đủ (hoặc quá lớn) để khớp với các game ${filterText} hiện có. Thử đổi ngân sách nhé!`;
+      
+      // Smart explanation
+      const sortedPool = [...pool].sort((a, b) => a._calcPrice - b._calcPrice);
+      if (sortedPool.length >= 2) {
+        const cheapest2Sum = sortedPool[0]._calcPrice + sortedPool[1]._calcPrice;
+        if (cheapest2Sum > budget) {
+          explainText = `Dữ liệu hiện tại có <strong>${sortedPool.length}</strong> game ${filterText} trùng khớp thể loại.<br>Nhưng 2 game <strong>RẺ NHẤT</strong> là <strong>${sortedPool[0].name}</strong> (${sortedPool[0]._calcPrice.toLocaleString('vi-VN')}đ) và <strong>${sortedPool[1].name}</strong> (${sortedPool[1]._calcPrice.toLocaleString('vi-VN')}đ) cộng lại đã là <strong style="color:var(--error);">${cheapest2Sum.toLocaleString('vi-VN')}đ</strong>, <strong>VƯỢT QUÁ</strong> ngân sách của bạn!`;
+        } else {
+          explainText = `Dữ liệu hiện tại có <strong>${sortedPool.length}</strong> game ${filterText} trùng khớp thể loại.<br>Tuy nhiên thuật toán Knapsack không thể tìm được tổ hợp 2+ game nào vừa khít với ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> của bạn.`;
+        }
+      }
+
       results.innerHTML = `
         <div style="text-align:center;padding:30px;color:var(--text-muted);">
           <div style="font-size:40px;margin-bottom:10px;">🎯</div>
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Không tìm được combo khít!</div>
-          <div style="font-size:13px;">Ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> chưa đủ (hoặc quá lớn) để khớp với các game ${filterText} hiện có. Thử đổi ngân sách nhé!</div>
+          <div style="font-size:13px;line-height:1.6;background:var(--surface-hover);padding:14px;border-radius:12px;margin-top:12px;display:inline-block;text-align:left;max-width:460px;border:1px solid var(--border);">
+            ${explainText}
+            <div style="margin-top:10px;font-size:11px;color:var(--text-secondary);border-top:1px dashed var(--border);padding-top:8px;">
+              💡 <strong>Xin lưu ý:</strong> Tính năng này chỉ quét các game <i>đang HOT / Featured</i> trên trang chủ Steam (khoảng ~150-200 game), <strong>KHÔNG</strong> quét toàn bộ 100.000+ game của Steam. Việc áp quá nhiều bộ lọc sẽ khiến danh sách không còn game nào.
+            </div>
+          </div>
         </div>`;
       return;
     }
