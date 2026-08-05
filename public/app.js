@@ -2807,19 +2807,31 @@ document.addEventListener("click", (e) => {
 
 // 1. BUDGET COMBO FINDER (Knapsack Subset Sum Algorithm)
 function initBudgetComboModal() {
-  const modal = document.getElementById("budgetComboModal");
+  const modal   = document.getElementById("budgetComboModal");
   const openBtn = document.getElementById("openBudgetComboBtn");
   const closeBtn = document.getElementById("closeBudgetComboModal");
-  const runBtn = document.getElementById("runBudgetComboBtn");
-  const input = document.getElementById("budgetComboInput");
+  const runBtn  = document.getElementById("runBudgetComboBtn");
+  const input   = document.getElementById("budgetComboInput");
   const results = document.getElementById("budgetComboResults");
 
   if (!modal) return;
 
-  openBtn.addEventListener("click", () => {
+  // ── Preset chips ─────────────────────────────────────────────────────────
+  document.getElementById("budgetPresets")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".budget-preset");
+    if (!btn) return;
+    input.value = btn.dataset.value;
+    document.querySelectorAll(".budget-preset").forEach(b => {
+      b.style.background = "transparent"; b.style.color = "var(--text-secondary)"; b.style.borderColor = "var(--border)";
+    });
+    btn.style.background = "rgba(243,156,18,0.15)"; btn.style.color = "#f39c12"; btn.style.borderColor = "#f39c12";
+    runBtn?.click();
+  });
+
+  openBtn?.addEventListener("click", () => {
     modal.classList.remove("hidden");
     if (input && !input.value) input.value = "150000";
-    if (runBtn) runBtn.click();
+    runBtn?.click();
   });
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
@@ -2827,11 +2839,28 @@ function initBudgetComboModal() {
   runBtn?.addEventListener("click", async () => {
     const budget = Number(input?.value);
     if (!budget || budget <= 0) {
-      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Vui lòng nhập ngân sách hợp lệ (ví dụ: 150000 VNĐ).</div>`;
+      results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;">⚠️ Vui lòng nhập ngân sách hợp lệ.</div>`;
       return;
     }
 
-    results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);"><div class="spin-icon" style="display:inline-block;animation:spin 1s linear infinite;">🔄 Đang quét live danh sách deal từ Steam API...</div></div>`;
+    // Skeleton loader
+    results.innerHTML = `
+      <style>
+        @keyframes budgetSlideIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+      </style>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        ${[1,2,3].map(() => `
+          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;padding:16px;">
+            <div style="height:14px;width:40%;border-radius:4px;background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite;margin-bottom:12px;"></div>
+            <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite;margin-bottom:14px;"></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              ${[1,2,3].map(() => `<div style="height:60px;border-radius:8px;background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite;"></div>`).join("")}
+            </div>
+          </div>`).join("")}
+      </div>
+      <div style="text-align:center;color:var(--text-muted);font-size:12px;margin-top:4px;">⚙️ Đang chạy thuật toán Knapsack...</div>
+    `;
 
     let rawPool = [];
     try {
@@ -2857,143 +2886,209 @@ function initBudgetComboModal() {
       const price = rawPrice / 100;
       if (!id || seen.has(id) || price <= 0) return false;
       item._calcPrice = price;
+      item._discountPct = item.discount_percent || item.discountPercent || 0;
       seen.add(id);
       return true;
     });
 
     if (!pool.length) {
-      results.innerHTML = `<div style="color:var(--error); text-align:center; padding:12px;">Không thể tải dữ liệu deal từ Steam. Vui lòng kiểm tra lại kết nối.</div>`;
+      results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;background:rgba(231,76,60,0.08);border-radius:12px;border:1px solid rgba(231,76,60,0.2);">❌ Không thể tải dữ liệu deal từ Steam. Vui lòng thử lại sau.</div>`;
       return;
     }
 
-    // Enhanced DFS Knapsack Algorithm for Combos (2 to 5 games)
+    // ── Knapsack DFS ─────────────────────────────────────────────────────────
     const combos = [];
-    
-    // Sort pool by price descending for faster DFS bounding
     pool.sort((a, b) => b._calcPrice - a._calcPrice);
-    const subPool = pool.slice(0, 100); 
-    
-    let iterations = 0;
-    const MAX_ITERATIONS = 50000;
-    
-    function findCombos(minPct, maxItems) {
-      function dfs(startIndex, currentCombo, currentSum) {
-        iterations++;
-        if (iterations > MAX_ITERATIONS || combos.length > 500) return;
-        
-        if (currentCombo.length >= 2 && currentCombo.length <= maxItems) {
-          if (currentSum <= budget && currentSum >= budget * minPct) {
-            combos.push({ 
-              items: [...currentCombo], 
-              totalPrice: currentSum,
-              avgDiscount: currentCombo.reduce((acc, it) => acc + (it.discount_percent||0), 0) / currentCombo.length
-            });
-          }
-        }
-        
-        if (currentCombo.length >= maxItems) return;
+    const subPool = pool.slice(0, 100);
 
-        for (let i = startIndex; i < subPool.length; i++) {
-          const p = subPool[i]._calcPrice;
-          if (currentSum + p <= budget) {
-            currentCombo.push(subPool[i]);
-            dfs(i + 1, currentCombo, currentSum + p);
-            currentCombo.pop();
+    let iterations = 0;
+    const MAX_ITER = 50000;
+
+    function findCombos(minPct, maxItems) {
+      function dfs(startIdx, cur, curSum) {
+        if (++iterations > MAX_ITER || combos.length > 500) return;
+        if (cur.length >= 2 && cur.length <= maxItems && curSum <= budget && curSum >= budget * minPct) {
+          combos.push({
+            items: [...cur],
+            totalPrice: curSum,
+            avgDiscount: cur.reduce((s, it) => s + (it._discountPct || 0), 0) / cur.length,
+            saved: cur.reduce((s, it) => {
+              const orig = Number(it.original_price || it.originalPrice || (it.price && it.price.initial) || 0) / 100;
+              return s + Math.max(0, orig - it._calcPrice);
+            }, 0)
+          });
+        }
+        if (cur.length >= maxItems) return;
+        for (let i = startIdx; i < subPool.length; i++) {
+          if (curSum + subPool[i]._calcPrice <= budget) {
+            cur.push(subPool[i]);
+            dfs(i + 1, cur, curSum + subPool[i]._calcPrice);
+            cur.pop();
           }
         }
       }
       dfs(0, [], 0);
     }
 
-    // Try strict criteria first (85% budget, up to 5 items)
     findCombos(0.85, 5);
-    
-    // Relax to 70%, up to 4 items
-    if (combos.length === 0) {
-      iterations = 0;
-      findCombos(0.70, 4);
-    }
-    
-    // Relax to 50%, up to 3 items
-    if (combos.length === 0) {
-      iterations = 0;
-      findCombos(0.50, 3);
-    }
-    
-    // Deduplicate identical combos by IDs
-    const uniqueCombosMap = new Map();
+    if (!combos.length) { iterations = 0; findCombos(0.70, 4); }
+    if (!combos.length) { iterations = 0; findCombos(0.50, 3); }
+
+    // Dedup + score
+    const uniqMap = new Map();
     combos.forEach(c => {
-      const idKey = c.items.map(i => i.id || i.appId).sort().join('-');
-      if (!uniqueCombosMap.has(idKey)) uniqueCombosMap.set(idKey, c);
+      const key = c.items.map(i => i.id || i.appId).sort().join('-');
+      if (!uniqMap.has(key)) uniqMap.set(key, c);
     });
-    let uniqueCombos = Array.from(uniqueCombosMap.values());
-
-    // Sort by Total Price (closest to budget) and then by average discount
+    let uniqueCombos = Array.from(uniqMap.values());
     uniqueCombos.sort((a, b) => {
-      if (Math.abs(b.totalPrice - a.totalPrice) > 1000) {
-        return b.totalPrice - a.totalPrice;
-      }
-      return b.avgDiscount - a.avgDiscount;
+      const fitA = 1 - Math.abs(budget - a.totalPrice) / budget;
+      const fitB = 1 - Math.abs(budget - b.totalPrice) / budget;
+      const scoreA = fitA * 60 + (a.avgDiscount / 100) * 25 + (a.items.length / 5) * 15;
+      const scoreB = fitB * 60 + (b.avgDiscount / 100) * 25 + (b.items.length / 5) * 15;
+      return scoreB - scoreA;
     });
 
-    let maxDiscount = 0;
-    uniqueCombos.forEach(c => { if (c.avgDiscount > maxDiscount) maxDiscount = c.avgDiscount; });
-
-    const topCombos = uniqueCombos.slice(0, 5);
+    const maxDiscount = Math.max(...uniqueCombos.map(c => c.avgDiscount), 0);
+    const topCombos = uniqueCombos.slice(0, 6);
 
     if (!topCombos.length) {
-      results.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Không tìm thấy combo khít ngân sách ${budget.toLocaleString("vi-VN")}đ. Hãy thử tăng bớt ngân sách nhé!</div>`;
+      results.innerHTML = `
+        <div style="text-align:center;padding:30px;color:var(--text-muted);">
+          <div style="font-size:40px;margin-bottom:10px;">🎯</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Không tìm được combo khít!</div>
+          <div style="font-size:13px;">Ngân sách <strong>${budget.toLocaleString('vi-VN')}đ</strong> chưa đủ cho 2+ game đang giảm giá. Thử tăng lên nhé!</div>
+        </div>`;
       return;
     }
 
-    results.innerHTML = topCombos.map((combo, idx) => {
-      const pct = Math.min(100, Math.round((combo.totalPrice / budget) * 100));
-      let badges = [];
-      if (idx === 0) badges.push(`<span style="font-size:10px; background:var(--primary); color:#fff; padding:2px 6px; border-radius:10px;">🏆 Khít Nhất</span>`);
-      if (combo.avgDiscount === maxDiscount && maxDiscount >= 50) badges.push(`<span style="font-size:10px; background:var(--error); color:#fff; padding:2px 6px; border-radius:10px;">🔥 Siêu Rẻ</span>`);
-      if (combo.items.length >= 4) badges.push(`<span style="font-size:10px; background:var(--success); color:#fff; padding:2px 6px; border-radius:10px;">📦 Đa Dạng</span>`);
-      
-      const copyText = combo.items.map(i => `- ${i.name} (${(i._calcPrice||0).toLocaleString('vi-VN')}đ)`).join('\\n') + `\\nTổng: ${combo.totalPrice.toLocaleString('vi-VN')}đ`;
+    // ── Render combos ─────────────────────────────────────────────────────────
+    const badgeLabel = (combo, idx) => {
+      const badges = [];
+      if (idx === 0) badges.push(`<span style="font-size:10px;background:linear-gradient(135deg,#f39c12,#e74c3c);color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">🏆 Khít Nhất</span>`);
+      if (combo.avgDiscount === maxDiscount && maxDiscount >= 50) badges.push(`<span style="font-size:10px;background:#e74c3c20;color:#e74c3c;border:1px solid #e74c3c40;padding:2px 8px;border-radius:10px;font-weight:700;">🔥 Deal Sốc</span>`);
+      if (combo.items.length >= 4) badges.push(`<span style="font-size:10px;background:rgba(102,126,234,0.15);color:#667eea;border:1px solid rgba(102,126,234,0.3);padding:2px 8px;border-radius:10px;font-weight:700;">📦 Đa Dạng</span>`);
+      if (combo.saved >= 50000) badges.push(`<span style="font-size:10px;background:#27ae6020;color:#27ae60;border:1px solid #27ae6040;padding:2px 8px;border-radius:10px;font-weight:700;">💎 Tiết Kiệm ${Math.round(combo.saved/1000)}K</span>`);
+      return badges.join(" ");
+    };
 
-      return `
-      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <strong style="color:var(--primary); font-size:14px;">Combo #${idx + 1} (${combo.items.length} Game)</strong>
-            ${badges.join('')}
-          </div>
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-weight:700; color:var(--success); font-size:15px;">${combo.totalPrice.toLocaleString("vi-VN")}đ</span>
-            <button onclick="navigator.clipboard.writeText('${copyText}').then(()=>alert('Đã copy danh sách Combo!'))" style="background:var(--surface-hover); border:none; border-radius:4px; padding:4px 8px; cursor:pointer; color:var(--text-secondary); font-size:12px;" title="Copy danh sách">📋</button>
-          </div>
-        </div>
-        
-        <div style="margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:4px;">
-            <span>Đã dùng: ${pct}%</span>
-            <span>Ngân sách: ${budget.toLocaleString("vi-VN")}đ</span>
-          </div>
-          <div style="width:100%; height:6px; background:var(--surface-hover); border-radius:4px; overflow:hidden;">
-            <div style="height:100%; width:${pct}%; background:var(--primary); border-radius:4px;"></div>
-          </div>
-        </div>
+    const pctGradient = (pct) => {
+      if (pct >= 90) return "linear-gradient(90deg,#27ae60,#2ecc71)";
+      if (pct >= 75) return "linear-gradient(90deg,#f39c12,#f1c40f)";
+      return "linear-gradient(90deg,#e74c3c,#e67e22)";
+    };
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-          ${combo.items.map(item => `
-            <a href="https://store.steampowered.com/app/${item.id || item.appId}" target="_blank" style="text-decoration:none; display:flex; gap:8px; align-items:center; background:var(--surface-elevated); padding:6px; border-radius:6px; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-              <img src="${item.header_image || item.image || item.headerImage || `https://cdn.akamai.steamstatic.com/steam/apps/${item.id || item.appId}/header.jpg`}" style="width:60px; height:28px; object-fit:cover; border-radius:4px;">
-              <div style="display:flex; flex-direction:column;">
-                <div style="font-size:12px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${item.name}</div>
-                <div style="font-size:10px; color:var(--success); font-weight:700;">${item._calcPrice ? item._calcPrice.toLocaleString("vi-VN") + 'đ' : 'Miễn phí'}</div>
-              </div>
-            </a>
-          `).join("")}
-        </div>
+    results.innerHTML = `
+      <style>
+        @keyframes budgetSlideIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+      </style>
+      <div style="font-size:12px;color:var(--text-muted);text-align:center;padding:4px 0 8px;">
+        🎮 Tìm thấy <strong style="color:var(--text-primary);">${topCombos.length}</strong> combo trong pool <strong style="color:var(--text-primary);">${pool.length}</strong> game giảm giá
       </div>
-    `}).join("");
+      ${topCombos.map((combo, idx) => {
+        const pct = Math.min(100, Math.round((combo.totalPrice / budget) * 100));
+        const remaining = budget - combo.totalPrice;
+
+        const gameCards = combo.items.map(item => {
+          const appId = item.id || item.appId;
+          const img = item.header_image || item.image || item.headerImage || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+          const disc = item._discountPct;
+          return `
+            <a href="https://store.steampowered.com/app/${appId}" target="_blank" rel="noopener"
+               style="text-decoration:none;background:var(--surface-elevated);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:all 0.2s;"
+               onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='rgba(243,156,18,0.4)'"
+               onmouseout="this.style.transform='';this.style.borderColor='var(--border)'">
+              <div style="position:relative;">
+                <img src="${img}" style="width:100%;height:52px;object-fit:cover;display:block;" onerror="this.src='https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg'">
+                ${disc > 0 ? `<div style="position:absolute;top:4px;left:4px;background:#e74c3c;color:#fff;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;">-${disc}%</div>` : ''}
+              </div>
+              <div style="padding:6px 8px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.name}">${item.name}</div>
+                <div style="font-size:11px;font-weight:800;color:#f39c12;margin-top:2px;">${item._calcPrice.toLocaleString('vi-VN')}đ</div>
+              </div>
+            </a>`;
+        }).join("");
+
+        return `
+          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;animation:budgetSlideIn 0.4s ease both;animation-delay:${idx * 70}ms;"
+               onmouseover="this.style.borderColor='rgba(243,156,18,0.35)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.35)'"
+               onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow=''">
+
+            ${idx === 0 ? `<div style="background:linear-gradient(90deg,#f39c12,#e74c3c);height:3px;"></div>` : ''}
+
+            <!-- Header row -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px 8px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <strong style="color:var(--text-primary);font-size:13px;">Combo #${idx+1} · ${combo.items.length} Game</strong>
+                  ${badgeLabel(combo, idx)}
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">
+                  Tiết kiệm được <strong style="color:#27ae60;">${Math.round(combo.saved).toLocaleString('vi-VN')}đ</strong> so với giá gốc
+                  · Còn thừa <strong style="color:var(--text-secondary);">${Math.max(0,remaining).toLocaleString('vi-VN')}đ</strong>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-weight:800;font-size:17px;color:#f39c12;">${combo.totalPrice.toLocaleString('vi-VN')}đ</div>
+                <div style="font-size:10px;color:var(--text-muted);">/ ${budget.toLocaleString('vi-VN')}đ</div>
+              </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div style="padding:0 14px 10px;">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:4px;">
+                <span>Độ khít ngân sách</span><span style="font-weight:700;color:var(--text-primary);">${pct}%</span>
+              </div>
+              <div style="height:7px;background:var(--surface-hover);border-radius:6px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:${pctGradient(pct)};border-radius:6px;transition:width 0.8s ease;"></div>
+              </div>
+            </div>
+
+            <!-- Game cards grid -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;padding:0 14px 12px;">
+              ${gameCards}
+            </div>
+
+            <!-- Footer actions -->
+            <div style="display:flex;gap:8px;padding:10px 14px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);">
+              <button class="combo-share-btn" data-idx="${idx}"
+                style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-secondary);font-size:11px;font-weight:600;padding:7px;border-radius:8px;cursor:pointer;transition:all 0.2s;"
+                onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">📋 Copy Combo</button>
+              <button class="combo-open-all-btn" data-idx="${idx}"
+                style="flex:1;background:linear-gradient(135deg,#f39c12,#e74c3c);border:none;color:#fff;font-size:11px;font-weight:700;padding:7px;border-radius:8px;cursor:pointer;transition:opacity 0.2s;"
+                onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🛒 Chốt Combo</button>
+            </div>
+          </div>`;
+      }).join("")}
+    `;
+
+    // ── Wire up Copy + Chốt Combo buttons ────────────────────────────────────
+    results.querySelectorAll(".combo-share-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        const combo = topCombos[idx];
+        const text = `🎯 Combo Khít Ngân Sách ${budget.toLocaleString('vi-VN')}đ:\n` +
+          combo.items.map(i => `• ${i.name} — ${i._calcPrice.toLocaleString('vi-VN')}đ${i._discountPct > 0 ? ` (-${i._discountPct}%)` : ''}`).join('\n') +
+          `\n💰 Tổng: ${combo.totalPrice.toLocaleString('vi-VN')}đ (${Math.round((combo.totalPrice/budget)*100)}% ngân sách)`;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = "✅ Đã copy!";
+          setTimeout(() => { btn.textContent = "📋 Copy Combo"; }, 2000);
+        });
+      });
+    });
+
+    results.querySelectorAll(".combo-open-all-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        topCombos[idx].items.forEach((item, i) => {
+          const appId = item.id || item.appId;
+          setTimeout(() => window.open(`https://store.steampowered.com/cart/addtocart/${appId}`, '_blank'), i * 350);
+        });
+      });
+    });
   });
 }
-
 // 2. CO-OP WISHLIST MATCHER
 function initCoopWishlistModal() {
   const modal = document.getElementById("coopWishlistModal");
