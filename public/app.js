@@ -3018,17 +3018,15 @@ function initBudgetComboModal() {
       return;
     }
 
-    // ── Knapsack DFS ─────────────────────────────────────────────────────────
+    // ── Smart Knapsack DFS ───────────────────────────────────────────────────
     const combos = [];
-    pool.sort((a, b) => b._calcPrice - a._calcPrice);
-    const subPool = pool.slice(0, 100);
-
     let iterations = 0;
-    const MAX_ITER = 50000;
+    const MAX_ITER = 30000; // per run to keep it fast
 
-    function findCombos(minPct, maxItems) {
+    function findCombos(currentPool, minPct, maxItems) {
+      iterations = 0;
       function dfs(startIdx, cur, curSum) {
-        if (++iterations > MAX_ITER || combos.length > 500) return;
+        if (++iterations > MAX_ITER || combos.length > 2000) return;
         if (cur.length >= 2 && cur.length <= maxItems && curSum <= budget && curSum >= budget * minPct) {
           combos.push({
             items: [...cur],
@@ -3041,10 +3039,10 @@ function initBudgetComboModal() {
           });
         }
         if (cur.length >= maxItems) return;
-        for (let i = startIdx; i < subPool.length; i++) {
-          if (curSum + subPool[i]._calcPrice <= budget) {
-            cur.push(subPool[i]);
-            dfs(i + 1, cur, curSum + subPool[i]._calcPrice);
+        for (let i = startIdx; i < currentPool.length; i++) {
+          if (curSum + currentPool[i]._calcPrice <= budget) {
+            cur.push(currentPool[i]);
+            dfs(i + 1, cur, curSum + currentPool[i]._calcPrice);
             cur.pop();
           }
         }
@@ -3052,27 +3050,58 @@ function initBudgetComboModal() {
       dfs(0, [], 0);
     }
 
-    findCombos(0.85, 5);
-    if (!combos.length) { iterations = 0; findCombos(0.70, 4); }
-    if (!combos.length) { iterations = 0; findCombos(0.50, 3); }
+    // Run DFS with different perspectives to maximize diversity
+    const poolDesc = [...pool].sort((a, b) => b._calcPrice - a._calcPrice).slice(0, 100);
+    const poolAsc = [...pool].sort((a, b) => a._calcPrice - b._calcPrice).slice(0, 100);
+    const poolRand = [...pool].sort(() => Math.random() - 0.5).slice(0, 100);
 
-    // Dedup + score
+    findCombos(poolDesc, 0.85, 5); // Find tight combos with expensive games
+    findCombos(poolAsc, 0.70, 10); // Find massive quantity combos with cheap games
+    findCombos(poolRand, 0.75, 6); // Find varied combos
+
+    if (!combos.length) findCombos(poolDesc, 0.60, 4); // Fallback
+
+    // Dedup
     const uniqMap = new Map();
     combos.forEach(c => {
       const key = c.items.map(i => i.id || i.appId).sort().join('-');
       if (!uniqMap.has(key)) uniqMap.set(key, c);
     });
     let uniqueCombos = Array.from(uniqMap.values());
-    uniqueCombos.sort((a, b) => {
-      const fitA = 1 - Math.abs(budget - a.totalPrice) / budget;
-      const fitB = 1 - Math.abs(budget - b.totalPrice) / budget;
-      const scoreA = fitA * 60 + (a.avgDiscount / 100) * 25 + (a.items.length / 5) * 15;
-      const scoreB = fitB * 60 + (b.avgDiscount / 100) * 25 + (b.items.length / 5) * 15;
-      return scoreB - scoreA;
+
+    // ── Smart Categorization ──────────────────────────────────────────────────
+    const categories = [
+      { id: "closest", title: "🎯 Sát Giá Nhất", color: "#f39c12", sortFn: (a, b) => b.totalPrice - a.totalPrice || b.avgDiscount - a.avgDiscount },
+      { id: "discount", title: "🔥 Deal Sốc Nhất", color: "#e74c3c", sortFn: (a, b) => b.avgDiscount - a.avgDiscount || b.totalPrice - a.totalPrice },
+      { id: "quantity", title: "📦 Số Lượng Áp Đảo", color: "#667eea", sortFn: (a, b) => b.items.length - a.items.length || b.totalPrice - a.totalPrice },
+      { id: "saved", title: "💎 Siêu Tiết Kiệm", color: "#27ae60", sortFn: (a, b) => b.saved - a.saved || b.totalPrice - a.totalPrice },
+      { id: "balanced", title: "⚖️ Cân Bằng Hoàn Hảo", color: "#9b59b6", sortFn: (a, b) => {
+        const fitA = 1 - Math.abs(budget - a.totalPrice) / budget;
+        const fitB = 1 - Math.abs(budget - b.totalPrice) / budget;
+        const scoreA = fitA * 60 + (a.avgDiscount / 100) * 25 + (a.items.length / 5) * 15;
+        const scoreB = fitB * 60 + (b.avgDiscount / 100) * 25 + (b.items.length / 5) * 15;
+        return scoreB - scoreA;
+      }}
+    ];
+
+    const finalCombos = [];
+    const usedKeys = new Set();
+
+    categories.forEach(cat => {
+      const available = uniqueCombos.filter(c => {
+        const key = c.items.map(i => i.id || i.appId).sort().join('-');
+        return !usedKeys.has(key);
+      });
+      if (available.length > 0) {
+        available.sort(cat.sortFn);
+        const best = available[0];
+        best.category = cat;
+        finalCombos.push(best);
+        usedKeys.add(best.items.map(i => i.id || i.appId).sort().join('-'));
+      }
     });
 
-    const maxDiscount = Math.max(...uniqueCombos.map(c => c.avgDiscount), 0);
-    const topCombos = uniqueCombos.slice(0, 6);
+    const topCombos = finalCombos;
 
     if (!topCombos.length) {
       results.innerHTML = `
@@ -3085,15 +3114,6 @@ function initBudgetComboModal() {
     }
 
     // ── Render combos ─────────────────────────────────────────────────────────
-    const badgeLabel = (combo, idx) => {
-      const badges = [];
-      if (idx === 0) badges.push(`<span style="font-size:10px;background:linear-gradient(135deg,#f39c12,#e74c3c);color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">🏆 Khít Nhất</span>`);
-      if (combo.avgDiscount === maxDiscount && maxDiscount >= 50) badges.push(`<span style="font-size:10px;background:#e74c3c20;color:#e74c3c;border:1px solid #e74c3c40;padding:2px 8px;border-radius:10px;font-weight:700;">🔥 Deal Sốc</span>`);
-      if (combo.items.length >= 4) badges.push(`<span style="font-size:10px;background:rgba(102,126,234,0.15);color:#667eea;border:1px solid rgba(102,126,234,0.3);padding:2px 8px;border-radius:10px;font-weight:700;">📦 Đa Dạng</span>`);
-      if (combo.saved >= 50000) badges.push(`<span style="font-size:10px;background:#27ae6020;color:#27ae60;border:1px solid #27ae6040;padding:2px 8px;border-radius:10px;font-weight:700;">💎 Tiết Kiệm ${Math.round(combo.saved/1000)}K</span>`);
-      return badges.join(" ");
-    };
-
     const pctGradient = (pct) => {
       if (pct >= 90) return "linear-gradient(90deg,#27ae60,#2ecc71)";
       if (pct >= 75) return "linear-gradient(90deg,#f39c12,#f1c40f)";
@@ -3105,7 +3125,7 @@ function initBudgetComboModal() {
         @keyframes budgetSlideIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
       </style>
       <div style="font-size:12px;color:var(--text-muted);text-align:center;padding:4px 0 8px;">
-        🎮 Tìm thấy <strong style="color:var(--text-primary);">${topCombos.length}</strong> combo trong pool <strong style="color:var(--text-primary);">${pool.length}</strong> game giảm giá
+        🎮 Tìm thấy <strong style="color:var(--text-primary);">${topCombos.length}</strong> lựa chọn đỉnh nhất trong <strong style="color:var(--text-primary);">${uniqueCombos.length}</strong> combo
       </div>
       ${topCombos.map((combo, idx) => {
         const pct = Math.min(100, Math.round((combo.totalPrice / budget) * 100));
@@ -3136,14 +3156,14 @@ function initBudgetComboModal() {
                onmouseover="this.style.borderColor='rgba(243,156,18,0.35)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.35)'"
                onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow=''">
 
-            ${idx === 0 ? `<div style="background:linear-gradient(90deg,#f39c12,#e74c3c);height:3px;"></div>` : ''}
+            ${combo.category ? `<div style="background:${combo.category.color};height:4px;"></div>` : ''}
 
             <!-- Header row -->
             <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px 8px;">
               <div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <strong style="color:var(--text-primary);font-size:13px;">Combo #${idx+1} · ${combo.items.length} Game</strong>
-                  ${badgeLabel(combo, idx)}
+                  <strong style="color:${combo.category ? combo.category.color : 'var(--text-primary)'};font-size:14px;">${combo.category ? combo.category.title : `Combo #${idx+1}`}</strong>
+                  <span style="font-size:11px;color:var(--text-muted);font-weight:600;padding:2px 8px;background:var(--surface-hover);border-radius:12px;">${combo.items.length} Game</span>
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">
                   Tiết kiệm được <strong style="color:#27ae60;">${Math.round(combo.saved).toLocaleString('vi-VN')}đ</strong> so với giá gốc
