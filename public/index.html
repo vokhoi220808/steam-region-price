@@ -878,6 +878,19 @@
               style="width:100%;height:46px;padding:0 14px 0 32px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:15px;font-weight:700;color:var(--text-primary);outline:none;box-sizing:border-box;transition:border 0.2s;"
               onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
           </div>
+          <div style="flex:1;position:relative;">
+            <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-muted);pointer-events:none;">🏷️</span>
+            <input type="text" id="budgetComboGenre" list="budgetGenreList" placeholder="Thể loại (Tùy chọn)..."
+              style="width:100%;height:46px;padding:0 14px 0 32px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-primary);outline:none;box-sizing:border-box;transition:border 0.2s;"
+              onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+            <datalist id="budgetGenreList">
+              <option value="Indie"><option value="Action"><option value="Adventure"><option value="Casual"><option value="Singleplayer">
+              <option value="Simulation"><option value="RPG"><option value="Strategy"><option value="2D"><option value="Early Access">
+              <option value="3D"><option value="Free to Play"><option value="Atmospheric"><option value="Story Rich"><option value="Multiplayer">
+              <option value="Co-op"><option value="Online Co-Op"><option value="Survival"><option value="Anime"><option value="Horror">
+              <option value="Sci-fi"><option value="Sports"><option value="Racing"><option value="Open World"><option value="FPS">
+            </datalist>
+          </div>
           <button id="runBudgetComboBtn"
             style="background:linear-gradient(135deg,#f39c12,#e74c3c);border:none;color:#fff;font-size:14px;font-weight:700;padding:0 24px;height:46px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:opacity 0.2s;min-width:130px;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🎯 Tìm Combo</button>

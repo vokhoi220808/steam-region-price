@@ -2836,8 +2836,11 @@ function initBudgetComboModal() {
   closeBtn?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
 
+  const genreInput = document.getElementById("budgetComboGenre");
+
   runBtn?.addEventListener("click", async () => {
     const budget = Number(input?.value);
+    const targetGenre = genreInput?.value?.trim().toLowerCase();
     if (!budget || budget <= 0) {
       results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;">⚠️ Vui lòng nhập ngân sách hợp lệ.</div>`;
       return;
@@ -2880,7 +2883,7 @@ function initBudgetComboModal() {
 
     // Deduplicate pool
     const seen = new Set();
-    const pool = rawPool.filter(item => {
+    let pool = rawPool.filter(item => {
       const id = item.id || item.appId;
       const rawPrice = Number(item.final_price || item.finalPrice || (item.price && item.price.final) || 0);
       const price = rawPrice / 100;
@@ -2891,8 +2894,39 @@ function initBudgetComboModal() {
       return true;
     });
 
+    if (targetGenre && pool.length > 0) {
+      const loadingText = document.querySelector("#budgetComboResults > div:last-child");
+      if (loadingText) loadingText.innerHTML = `🔄 Đang quét thể loại <strong style="color:var(--text-primary)">${genreInput.value}</strong> cho ${pool.length} game...`;
+
+      const allAppIds = pool.map(item => item.id || item.appId);
+      const metadataMap = new Map();
+
+      // Fetch in chunks of 30 to respect Steam/Backend limits
+      for (let i = 0; i < allAppIds.length; i += 30) {
+        const chunk = allAppIds.slice(i, i + 30);
+        try {
+          const res = await fetch(`/api/deals/metadata?appids=${chunk.join(",")}`);
+          const d = await res.json();
+          if (d.items) d.items.forEach(m => metadataMap.set(Number(m.appId), m));
+        } catch(e) {}
+      }
+
+      pool = pool.filter(item => {
+        const appId = Number(item.id || item.appId);
+        const meta = metadataMap.get(appId);
+        if (!meta || !meta.tags) return false;
+        return meta.tags.some(t => t.toLowerCase().includes(targetGenre));
+      });
+      
+      if (loadingText) loadingText.innerHTML = `⚙️ Đang chạy thuật toán Knapsack trên ${pool.length} game (thể loại ${genreInput.value})...`;
+    }
+
     if (!pool.length) {
-      results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;background:rgba(231,76,60,0.08);border-radius:12px;border:1px solid rgba(231,76,60,0.2);">❌ Không thể tải dữ liệu deal từ Steam. Vui lòng thử lại sau.</div>`;
+      if (targetGenre) {
+        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game thể loại <strong>${genreInput.value}</strong> nào đang giảm giá trong pool hiện tại. Thử thể loại khác nhé!</div>`;
+      } else {
+        results.innerHTML = `<div style="color:var(--error);text-align:center;padding:20px;background:rgba(231,76,60,0.08);border-radius:12px;border:1px solid rgba(231,76,60,0.2);">❌ Không thể tải dữ liệu deal từ Steam. Vui lòng thử lại sau.</div>`;
+      }
       return;
     }
 
