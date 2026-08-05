@@ -78,19 +78,19 @@ const METADATA_TTL = 6 * 60 * 60 * 1000;
 const LIVE_STATS_TTL = 5 * 60 * 1000;
 
 const STEAM_SALE_EVENTS = [
-  { id: "cyberpunk-2026", name: "Cyberpunk Fest", kind: "festival", start: "2026-08-03T17:00:00Z", end: "2026-08-10T17:00:00Z" },
-  { id: "pins-pegs-2026", name: "Pins & Pegs Fest", kind: "festival", start: "2026-08-17T17:00:00Z", end: "2026-08-20T17:00:00Z" },
-  { id: "pve-survival-2026", name: "PvE Survival Crafting Fest", kind: "festival", start: "2026-08-31T17:00:00Z", end: "2026-09-07T17:00:00Z" },
-  { id: "programming-2026", name: "Programming Fest", kind: "festival", start: "2026-09-10T17:00:00Z", end: "2026-09-14T17:00:00Z" },
-  { id: "party-rpg-2026", name: "Party-Based RPG Fest", kind: "festival", start: "2026-09-14T17:00:00Z", end: "2026-09-21T17:00:00Z" },
-  { id: "autumn-2026", name: "Steam Autumn Sale", kind: "seasonal", start: "2026-10-01T17:00:00Z", end: "2026-10-08T17:00:00Z" },
-  { id: "cooking-2026", name: "Cooking Fest", kind: "festival", start: "2026-10-12T17:00:00Z", end: "2026-10-19T17:00:00Z" },
-  { id: "next-oct-2026", name: "Steam Next Fest", kind: "next_fest", start: "2026-10-19T17:00:00Z", end: "2026-10-26T17:00:00Z" },
-  { id: "scream-2026", name: "Steam Scream V", kind: "festival", start: "2026-10-26T17:00:00Z", end: "2026-11-02T18:00:00Z" },
-  { id: "auto-battler-2026", name: "Auto-Battler RPG Fest", kind: "festival", start: "2026-11-16T18:00:00Z", end: "2026-11-23T18:00:00Z" },
-  { id: "winter-2026", name: "Steam Winter Sale", kind: "seasonal", start: "2026-12-17T18:00:00Z", end: "2027-01-04T18:00:00Z" },
-  { id: "spring-2027", name: "Steam Spring Sale", kind: "seasonal", start: "2027-03-18T17:00:00Z", end: "2027-03-25T17:00:00Z" },
-  { id: "summer-2027", name: "Steam Summer Sale", kind: "seasonal", start: "2027-06-24T17:00:00Z", end: "2027-07-08T17:00:00Z" }
+  { id: "cyberpunk-2026", name: "Cyberpunk Fest", kind: "festival", start: "2026-08-03T17:00:00Z", end: "2026-08-10T17:00:00Z", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=600&auto=format&fit=crop" },
+  { id: "pins-pegs-2026", name: "Pins & Pegs Fest", kind: "festival", start: "2026-08-17T17:00:00Z", end: "2026-08-20T17:00:00Z", image: "https://images.unsplash.com/photo-1611996575749-79a3a250f948?q=80&w=600&auto=format&fit=crop" },
+  { id: "pve-survival-2026", name: "PvE Survival Crafting Fest", kind: "festival", start: "2026-08-31T17:00:00Z", end: "2026-09-07T17:00:00Z", image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600&auto=format&fit=crop" },
+  { id: "programming-2026", name: "Programming Fest", kind: "festival", start: "2026-09-10T17:00:00Z", end: "2026-09-14T17:00:00Z", image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=600&auto=format&fit=crop" },
+  { id: "party-rpg-2026", name: "Party-Based RPG Fest", kind: "festival", start: "2026-09-14T17:00:00Z", end: "2026-09-21T17:00:00Z", image: "https://images.unsplash.com/photo-1588880629555-d14f48ff7989?q=80&w=600&auto=format&fit=crop" },
+  { id: "autumn-2026", name: "Steam Autumn Sale", kind: "seasonal", start: "2026-10-01T17:00:00Z", end: "2026-10-08T17:00:00Z", image: "https://images.unsplash.com/photo-1507368297750-f8fb2fa174da?q=80&w=600&auto=format&fit=crop" },
+  { id: "cooking-2026", name: "Cooking Fest", kind: "festival", start: "2026-10-12T17:00:00Z", end: "2026-10-19T17:00:00Z", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=600&auto=format&fit=crop" },
+  { id: "next-oct-2026", name: "Steam Next Fest", kind: "next_fest", start: "2026-10-19T17:00:00Z", end: "2026-10-26T17:00:00Z", image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=600&auto=format&fit=crop" },
+  { id: "scream-2026", name: "Steam Scream V", kind: "festival", start: "2026-10-26T17:00:00Z", end: "2026-11-02T18:00:00Z", image: "https://images.unsplash.com/photo-1508361001413-7a9dca21d08a?q=80&w=600&auto=format&fit=crop" },
+  { id: "auto-battler-2026", name: "Auto-Battler RPG Fest", kind: "festival", start: "2026-11-16T18:00:00Z", end: "2026-11-23T18:00:00Z", image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=600&auto=format&fit=crop" },
+  { id: "winter-2026", name: "Steam Winter Sale", kind: "seasonal", start: "2026-12-17T18:00:00Z", end: "2027-01-04T18:00:00Z", image: "https://images.unsplash.com/photo-1544335443-4dc975b9de0e?q=80&w=600&auto=format&fit=crop" },
+  { id: "spring-2027", name: "Steam Spring Sale", kind: "seasonal", start: "2027-03-18T17:00:00Z", end: "2027-03-25T17:00:00Z", image: "https://images.unsplash.com/photo-1490750967868-88aa4486c946?q=80&w=600&auto=format&fit=crop" },
+  { id: "summer-2027", name: "Steam Summer Sale", kind: "seasonal", start: "2027-06-24T17:00:00Z", end: "2027-07-08T17:00:00Z", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop" }
 ];
 
 function getCache(key) {
