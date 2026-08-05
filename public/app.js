@@ -3010,7 +3010,7 @@ function initBudgetComboModal() {
         }).join("");
 
         return `
-          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;animation:budgetSlideIn 0.4s ease both;animation-delay:${idx * 70}ms;"
+          <div style="flex-shrink:0;background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;animation:budgetSlideIn 0.4s ease both;animation-delay:${idx * 70}ms;"
                onmouseover="this.style.borderColor='rgba(243,156,18,0.35)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.35)'"
                onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow=''">
 
@@ -3169,7 +3169,7 @@ function initCoopWishlistModal() {
       ).join("");
 
       return `
-        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;animation:slideInUp 0.4s ease both;animation-delay:${idx * 60}ms;"
+        <div style="flex-shrink:0;background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;animation:slideInUp 0.4s ease both;animation-delay:${idx * 60}ms;"
              onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,0.5)';this.style.borderColor='rgba(102,126,234,0.4)'"
              onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='var(--border)'">
 
