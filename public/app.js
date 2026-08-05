@@ -3015,12 +3015,12 @@ function initBudgetComboModal() {
       if (loadingText) loadingText.innerHTML = `⚙️ Đang chạy thuật toán Knapsack trên ${pool.length} game (thể loại ${genresStr})...`;
     }
 
-    if (!pool.length) {
+    if (pool.length < 2) {
       const filterText = discountFilter === "full_only" ? "nguyên giá" : discountFilter === "discount_only" ? "đang giảm giá" : "nào";
       if (selectedGenres.length > 0) {
-        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game ${filterText} chứa đủ các thể loại <strong>${selectedGenres.join(", ")}</strong> trong dữ liệu hiện tại. Thử bớt thể loại nhé!</div>`;
+        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Chỉ tìm thấy <strong>${pool.length}</strong> game ${filterText} chứa đủ các thể loại <strong>${selectedGenres.join(", ")}</strong>. (Cần ít nhất 2 game để tạo combo). Thử bớt thể loại nhé!</div>`;
       } else {
-        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Không tìm thấy game ${filterText} nào trong dữ liệu hiện tại. Thử đổi bộ lọc nhé!</div>`;
+        results.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;background:var(--surface-hover);border-radius:12px;border:1px solid var(--border);">Chỉ tìm thấy <strong>${pool.length}</strong> game ${filterText} trong dữ liệu (Cần ít nhất 2 game để tạo combo). Thử đổi bộ lọc nhé!</div>`;
       }
       return;
     }
@@ -3068,6 +3068,8 @@ function initBudgetComboModal() {
 
     if (!combos.length) findCombos(poolDesc, 0.60, 4); // Fallback
     if (!combos.length) findCombos(poolDesc, 0.02, 10); // Extreme fallback for very large budgets
+    if (!combos.length) findCombos(poolDesc, 0.0, 15); // Ultimate fallback: just find anything that fits
+
 
     // Dedup
     const uniqMap = new Map();
