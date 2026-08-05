@@ -676,17 +676,110 @@ app.get("/api/history/internal/:appId", async (req, res) => {
 });
 
 async function getDealsData(cc) {
-  const cacheKey = `deals:${cc}`;
+  const DEALS_MASSIVE_TTL = 60 * 60 * 1000; // 1 hour for massive payload
+  const cacheKey = `deals_massive:${cc}`;
   let cached = getCache(cacheKey);
   if (!cached) cached = await distributedCacheGet(cacheKey);
   if (cached) {
-    setCache(cacheKey, cached, DEALS_TTL);
+    setCache(cacheKey, cached, DEALS_MASSIVE_TTL);
     return cached;
   }
-  const data = await fetchJson(`https://store.steampowered.com/api/featuredcategories?cc=${cc}`);
-  if (!data) throw new Error("Invalid data from Steam");
-  setCache(cacheKey, data, DEALS_TTL);
-  distributedCacheSet(cacheKey, data, Math.floor(DEALS_TTL / 1000));
+
+  // 1. Fetch Featured Categories (Fast, current sales)
+  const data = await fetchJson(`https://store.steampowered.com/api/featuredcategories?cc=${cc}`).catch(() => ({}));
+  if (!data || Object.keys(data).length === 0) throw new Error("Invalid data from Steam");
+
+  // Record existing AppIDs to avoid duplicates
+  const existingAppIds = new Set();
+  Object.values(data).forEach(cat => {
+    if (cat?.items && Array.isArray(cat.items)) {
+      cat.items.forEach(item => existingAppIds.add(Number(item.id || item.appId)));
+    }
+  });
+
+  // 2. Fetch Top 3000 Games from SteamSpy
+  const popularAppIds = new Set();
+  try {
+    const pages = [0, 1, 2];
+    await Promise.all(pages.map(async (page) => {
+      const spyData = await fetchJson(`https://steamspy.com/api.php?request=all&page=${page}`).catch(() => ({}));
+      Object.keys(spyData).forEach(id => {
+        const numId = Number(id);
+        if (numId && !existingAppIds.has(numId)) {
+          popularAppIds.add(numId);
+        }
+      });
+    }));
+  } catch (e) {
+    console.warn("Failed to fetch from SteamSpy", e);
+  }
+
+  // 3. Chunk and fetch prices from Steam
+  const appIdsArr = Array.from(popularAppIds);
+  const chunks = [];
+  for (let i = 0; i < appIdsArr.length; i += 30) {
+    chunks.push(appIdsArr.slice(i, i + 30));
+  }
+
+  const popularItems = [];
+  // Concurrency limit of 5 to avoid strict Steam rate limits
+  await mapWithConcurrency(chunks, 5, async (chunk) => {
+    try {
+      const url = `https://store.steampowered.com/api/appdetails?appids=${chunk.join(",")}&cc=${cc}&filters=price_overview,basic`;
+      const res = await fetch(url, { headers: { "User-Agent": "Steam-Regional-Price-Comparator/1.0" }, signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return;
+      const chunkData = await res.json();
+      
+      for (const [idStr, info] of Object.entries(chunkData || {})) {
+        if (info && info.success && info.data && info.data.type === 'game') {
+          const game = info.data;
+          const isFree = game.is_free || (game.price_overview && game.price_overview.final === 0);
+          
+          let finalPrice = 0;
+          let initialPrice = 0;
+          let discountPercent = 0;
+
+          if (game.price_overview) {
+            finalPrice = game.price_overview.final;
+            initialPrice = game.price_overview.initial;
+            discountPercent = game.price_overview.discount_percent;
+          } else if (!isFree) {
+            continue;
+          }
+
+          popularItems.push({
+            id: Number(idStr),
+            type: 0,
+            name: game.name,
+            discounted: discountPercent > 0,
+            discount_percent: discountPercent,
+            original_price: initialPrice,
+            final_price: finalPrice,
+            currency: game.price_overview?.currency || cc,
+            large_capsule_image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${idStr}/header.jpg`,
+            small_capsule_image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${idStr}/capsule_231x87.jpg`,
+            windows_available: game.platforms?.windows,
+            mac_available: game.platforms?.mac,
+            linux_available: game.platforms?.linux,
+            streamingvideo_available: false,
+            header_image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${idStr}/header.jpg`,
+            headline: ""
+          });
+        }
+      }
+    } catch (e) {}
+  });
+
+  if (popularItems.length > 0) {
+    data["top_popular"] = {
+      id: "top_popular",
+      name: "Top 3000 Popular Games",
+      items: popularItems
+    };
+  }
+
+  setCache(cacheKey, data, DEALS_MASSIVE_TTL);
+  distributedCacheSet(cacheKey, data, Math.floor(DEALS_MASSIVE_TTL / 1000));
   return data;
 }
 
